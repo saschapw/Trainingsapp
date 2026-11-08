@@ -893,7 +893,7 @@ function viewGriffTraining(){
     <div><label class="fldlab" for="gt_prog">Programm</label><input id="gt_prog" type="text" list="gtProgList" value="${esc(d.program||"")}"><datalist id="gtProgList">${GT_PROGRAMS.map(p=>`<option value="${esc(p)}">`).join("")}</datalist></div>
     ${gtKind(d)==="test"
       ?`<div><span class="fldlab">Hand</span><div class="opts">${[["both","beide"],["left","links"],["right","rechts"]].map(([k,l])=>`<button type="button" class="opt ${d.hand===k?"g":""}" data-act="gtHand" data-v="${k}">${l}</button>`).join("")}</div></div>`
-      :`<div><span class="fldlab">Ausführung</span><div class="opts">${[["bi","bilateral"],["uni","unilateral"]].map(([k,l])=>`<button type="button" class="opt ${gtLat(d)===k?"g":""}" data-act="gtLat" data-v="${k}">${l}</button>`).join("")}</div>${gtLat(d)==="uni"?`<p class="hint" style="margin:4px 0 0">Jede Seite einzeln — der Timer führt links und rechts nacheinander, TUT und Volumen zählen beide Seiten.</p>`:""}</div>`}
+      :`<div><span class="fldlab">Ausführung</span><div class="opts">${[["bi","bilateral"],["uni","unilateral"]].map(([k,l])=>`<button type="button" class="opt ${gtLat(d)===k?"g":""}" data-act="gtLat" data-v="${k}">${l}</button>`).join("")}</div>${gtLat(d)==="uni"?`<p class="hint" style="margin:4px 0 0">Jede Seite einzeln — der Timer wechselt bei jeder Wiederholung: links, Pause, rechts, Pause … TUT und Volumen zählen beide Seiten.</p>`:""}</div>`}
     <div class="grid3"><div><label class="fldlab" for="gt_sets">Sätze</label><input id="gt_sets" type="number" inputmode="numeric" value="${d.sets??""}" data-gt="sets"></div>
       <div><label class="fldlab" for="gt_reps">Wdh / Satz</label><input id="gt_reps" type="number" inputmode="numeric" value="${d.reps??""}" data-gt="reps"></div>
       <div><label class="fldlab" for="gt_sec">Sek / Wdh</label><input id="gt_sec" type="number" inputmode="numeric" value="${d.sec??""}" data-gt="sec"></div></div>
@@ -942,9 +942,9 @@ function gtPresetBar(ed){
 function gtPlan(d){const sets=Math.max(0,Math.round(d.sets||0)),reps=Math.max(0,Math.round(d.reps||0)),sec=+d.sec||0;if(!sets||!reps||!sec)return [];
   const rr=+d.restRep||0,rs=+d.restSet||0;const sides=gtKind(d)==="train"&&gtLat(d)==="uni"?["links","rechts"]:gtKind(d)==="test"&&d.hand==="left"?["links"]:gtKind(d)==="test"&&d.hand==="right"?["rechts"]:[""];
   const out=[{t:"prep",dur:5,label:"Bereit machen"}];
-  for(let s=1;s<=sets;s++){sides.forEach((side,si)=>{for(let r=1;r<=reps;r++){out.push({t:"work",dur:sec,label:"Halten"+(side?" · "+side:""),set:s,rep:r,side});
-        const lastRep=r===reps;if(!lastRep&&rr)out.push({t:"rest",dur:rr,label:"Pause",set:s,rep:r,side});}
-      if(si<sides.length-1)out.push({t:"rest",dur:Math.max(rr,10),label:"Seitenwechsel → "+sides[si+1],set:s,side});});
+  // Unilateral: pro Wiederholung links, Pause, rechts, Pause … (gleiche Pause wie zwischen den Wiederholungen)
+  for(let s=1;s<=sets;s++){for(let r=1;r<=reps;r++){sides.forEach((side,si)=>{out.push({t:"work",dur:sec,label:"Halten"+(side?" · "+side:""),set:s,rep:r,side});
+        const last=r===reps&&si===sides.length-1;if(!last&&rr)out.push({t:"rest",dur:rr,label:"Pause"+(sides.length>1?" → "+sides[(si+1)%sides.length]:""),set:s,rep:r,side});});}
     if(s<sets&&rs)out.push({t:"setrest",dur:rs,label:"Satzpause",set:s});}
   return out;}
 let gtT=null;
