@@ -537,9 +537,9 @@ function parseTrackingWb(wb){
   sheetObjs(wb,trkSheet(wb,"Tracking-Einstellungen","Einstellungen","Typ")).forEach(r=>{if(/wochen/i.test(String(r["Typ"]||""))){const k=String(r["ID"]||"").trim();if(k)N.settings.weekCats[k]=!/aus|nein|off/i.test(String(r["Wert"]||""));}});
   sheetObjs(wb,"Griff-Presets").forEach(r=>{const n=String(r["Preset"]||"").trim();if(!n)return;const h=String(r["Hand"]||"").toLowerCase();
     const hs=String(r["Hand / Ausführung"]||r["Hand"]||"").toLowerCase();const kind=/test/i.test(String(r["Art"]||""))?"test":"train";
-    N.settings.gripPresets.push({id:idOr(r["ID"],"gp"),name:n,kind,program:String(r["Programm"]||""),hand:/^l/.test(hs)?"left":/^r/.test(hs)?"right":"both",lat:/^uni/.test(hs)||(kind==="train"&&/^(l|r)/.test(hs))?"uni":"bi",sets:num(r["Sätze"]),reps:num(r["Wdh"]),sec:num(r["Sek/Wdh"]),restRep:num(r["Pause Wdh (s)"]),restSet:num(r["Satzpause (s)"]),load:num(r["Ø Last (kg)"]),note:String(r["Notiz"]||"")});});
+    N.settings.gripPresets.push({id:idOr(r["ID"],"gp"),name:n,kind,sw:/je satz/.test(hs)?"set":/allen/.test(hs)?"all":"rep",program:String(r["Programm"]||""),hand:/^l/.test(hs)?"left":/^r/.test(hs)?"right":"both",lat:/^uni/.test(hs)||(kind==="train"&&/^(l|r)/.test(hs))?"uni":"bi",sets:num(r["Sätze"]),reps:num(r["Wdh"]),sec:num(r["Sek/Wdh"]),restRep:num(r["Pause Wdh (s)"]),restSet:num(r["Satzpause (s)"]),load:num(r["Ø Last (kg)"]),note:String(r["Notiz"]||"")});});
   sheetObjs(wb,"Griff-Training").forEach(r=>{const d=toISODate(r["Datum"]);if(!d)return;const h=String(r["Hand / Ausführung"]||r["Hand"]||"").toLowerCase();const kind=/test/i.test(String(r["Art"]||""))?"test":"train";
-    N.gripTrain.push({id:idOr(r["ID"],"gt"),kind,lat:/^uni/.test(h)||(kind==="train"&&/^(l|r)/.test(h))?"uni":"bi",restRep:num(r["Pause Wdh (s)"]),restSet:num(r["Satzpause (s)"]),date:d,time:String(r["Zeit"]||""),source:/sensor/i.test(String(r["Quelle"]||""))?"sensor":"manual",program:String(r["Programm"]||""),hand:/^l/.test(h)?"left":/^r/.test(h)?"right":"both",
+    N.gripTrain.push({id:idOr(r["ID"],"gt"),kind,sw:/je satz/.test(h)?"set":/allen/.test(h)?"all":"rep",lat:/^uni/.test(h)||(kind==="train"&&/^(l|r)/.test(h))?"uni":"bi",restRep:num(r["Pause Wdh (s)"]),restSet:num(r["Satzpause (s)"]),date:d,time:String(r["Zeit"]||""),source:/sensor/i.test(String(r["Quelle"]||""))?"sensor":"manual",program:String(r["Programm"]||""),hand:/^l/.test(h)?"left":/^r/.test(h)?"right":"both",
       sets:num(r["Sätze"]),reps:num(r["Wdh"]),sec:num(r["Sek/Wdh"]),load:num(r["Ø Last (kg)"]),peak:num(r["Peak (kg)"]),tut:/sensor/i.test(String(r["Quelle"]||""))?num(r["TUT (s)"]):null,vol:/sensor/i.test(String(r["Quelle"]||""))?num(r["Volumen (kg·s)"]):null,mvc:num(r["Intensität (% MVC)"]),band:num(r["Im Zielband (%)"]),note:String(r["Notiz"]||""),sensorId:String(r["Sensor-ID"]||"")});});
   sheetObjs(wb,"Ziele-Notizen").forEach(r=>{const d=toISODate(r["Woche (Montag)"]);const area=String(r["Bereich-Key"]||"").trim();if(!d||!area)return;
     const dl=String(r["Dimension"]||"").toLowerCase();const dim=(area==="gesamt"||area==="balance")?"all":dl.startsWith("vol")?"vol":dl.startsWith("int")?"int":"all";
@@ -868,7 +868,9 @@ const GT_PROGRAMS=["Max Hangs","Repeaters","Pinch","Block / Lifting","Wrist Roll
 /* kind: "train" | "test" · Training: lat "bi" | "uni" (unilateral = jede Seite → TUT ×2) · Test: hand both|left|right */
 const gtKind=g=>g.kind==="test"?"test":"train";
 const gtLat=g=>g.lat||(g.hand==="left"||g.hand==="right"?"uni":"bi");
-function gtSideLabel(g){return gtKind(g)==="test"?(g.hand==="left"?"links":g.hand==="right"?"rechts":"beide"):(gtLat(g)==="uni"?"unilateral":"bilateral");}
+const gtSwitch=g=>g.sw==="set"||g.sw==="all"?g.sw:"rep";
+const GT_SW=[["rep","jede Wdh"],["set","jeder Satz"],["all","nach allen Sätzen"]];
+function gtSideLabel(g){return gtKind(g)==="test"?(g.hand==="left"?"links":g.hand==="right"?"rechts":"beide"):(gtLat(g)==="uni"?"unilateral"+(gtSwitch(g)==="set"?" (Wechsel je Satz)":gtSwitch(g)==="all"?" (Wechsel nach allen Sätzen)":""):"bilateral");}
 function gtCalc(g){const f=gtKind(g)==="train"&&gtLat(g)==="uni"?2:1;const tut=g.tut!=null?g.tut:(g.sets&&g.reps&&g.sec?g.sets*g.reps*g.sec*f:null);const vol=g.vol!=null?g.vol:(tut!=null&&g.load!=null?tut*g.load:null);return {tut,vol};}
 function gripSensorSessions(j){const arr=Array.isArray(j)?j:(j&&j.grip&&Array.isArray(j.grip.sessions))?j.grip.sessions:(j&&Array.isArray(j.sessions))?j.sessions:null;if(!arr)return [];
   return arr.map(x=>{const st=String(x.date||x.start||x.timestamp||"");const d=new Date(st);const ok=!isNaN(d);
@@ -883,7 +885,7 @@ function gripSensorFromWb(wb){ // CSV/Excel der Sensor-App (Spalten wie session_
 let gtDraft=null,gtEditId=null;
 function gtBlank(kind){kind=kind||UI.gtKind||"train";const last=(S.gripTrain||[]).filter(g=>g.source!=="sensor"&&gtKind(g)===kind).sort((a,b)=>a.date<b.date?1:-1)[0]||{};
   return kind==="test"?{kind,date:today(),program:last.program||"Max-Kraft-Test",hand:last.hand||"both",lat:"bi",sets:last.sets||1,reps:last.reps||3,sec:last.sec||5,restRep:last.restRep??60,restSet:last.restSet??0,load:null,peak:null,note:""}
-    :{kind,date:today(),program:last.program||"Max Hangs",hand:"both",lat:gtLat(last.lat?last:{lat:"bi"}),sets:last.sets||5,reps:last.reps||1,sec:last.sec||10,restRep:last.restRep??3,restSet:last.restSet??180,load:last.load??null,peak:null,note:""};}
+    :{kind,date:today(),program:last.program||"Max Hangs",hand:"both",lat:gtLat(last.lat?last:{lat:"bi"}),sw:gtSwitch(last),sets:last.sets||5,reps:last.reps||1,sec:last.sec||10,restRep:last.restRep??3,restSet:last.restSet??180,load:last.load??null,peak:null,note:""};}
 function viewGriffTraining(){
   const ed=gtEditId?(S.gripTrain||[]).find(g=>g.id===gtEditId):null;if(!gtDraft)gtDraft=ed?Object.assign({},ed):gtBlank();const d=gtDraft;const c=gtCalc(d);
   let h=`${gtPresetBar(ed)}<div class="card stack" ${ed?'style="border-color:var(--recovery)"':""}><h3>Griffkraft — ${ed?"bearbeiten":gtKind(d)==="test"?"neuer Test":"neue Trainingseinheit"}</h3>
@@ -893,7 +895,8 @@ function viewGriffTraining(){
     <div><label class="fldlab" for="gt_prog">Programm</label><input id="gt_prog" type="text" list="gtProgList" value="${esc(d.program||"")}"><datalist id="gtProgList">${GT_PROGRAMS.map(p=>`<option value="${esc(p)}">`).join("")}</datalist></div>
     ${gtKind(d)==="test"
       ?`<div><span class="fldlab">Hand</span><div class="opts">${[["both","beide"],["left","links"],["right","rechts"]].map(([k,l])=>`<button type="button" class="opt ${d.hand===k?"g":""}" data-act="gtHand" data-v="${k}">${l}</button>`).join("")}</div></div>`
-      :`<div><span class="fldlab">Ausführung</span><div class="opts">${[["bi","bilateral"],["uni","unilateral"]].map(([k,l])=>`<button type="button" class="opt ${gtLat(d)===k?"g":""}" data-act="gtLat" data-v="${k}">${l}</button>`).join("")}</div>${gtLat(d)==="uni"?`<p class="hint" style="margin:4px 0 0">Jede Seite einzeln — der Timer wechselt bei jeder Wiederholung: links, Pause, rechts, Pause … TUT und Volumen zählen beide Seiten.</p>`:""}</div>`}
+      :`<div><span class="fldlab">Ausführung</span><div class="opts">${[["bi","bilateral"],["uni","unilateral"]].map(([k,l])=>`<button type="button" class="opt ${gtLat(d)===k?"g":""}" data-act="gtLat" data-v="${k}">${l}</button>`).join("")}</div>${gtLat(d)==="uni"?`<span class="fldlab" style="margin-top:10px">Armwechsel</span><div class="opts">${GT_SW.map(([k,l])=>`<button type="button" class="opt ${gtSwitch(d)===k?"g":""}" data-act="gtSw" data-v="${k}">${l}</button>`).join("")}</div>
+      <p class="hint" style="margin:4px 0 0">${gtSwitch(d)==="rep"?"Links, Pause, rechts, Pause … — die Pause zw. Wdh gilt auch beim Handwechsel.":gtSwitch(d)==="set"?"Ein Satz links, Satzpause, ein Satz rechts, Satzpause …":"Alle Sätze links (mit Satzpausen), dann Armwechsel, dann alle Sätze rechts."} TUT und Volumen zählen beide Seiten.</p>`:""}</div>`}
     <div class="grid3"><div><label class="fldlab" for="gt_sets">Sätze</label><input id="gt_sets" type="number" inputmode="numeric" value="${d.sets??""}" data-gt="sets"></div>
       <div><label class="fldlab" for="gt_reps">Wdh / Satz</label><input id="gt_reps" type="number" inputmode="numeric" value="${d.reps??""}" data-gt="reps"></div>
       <div><label class="fldlab" for="gt_sec">Sek / Wdh</label><input id="gt_sec" type="number" inputmode="numeric" value="${d.sec??""}" data-gt="sec"></div></div>
@@ -942,10 +945,17 @@ function gtPresetBar(ed){
 function gtPlan(d){const sets=Math.max(0,Math.round(d.sets||0)),reps=Math.max(0,Math.round(d.reps||0)),sec=+d.sec||0;if(!sets||!reps||!sec)return [];
   const rr=+d.restRep||0,rs=+d.restSet||0;const sides=gtKind(d)==="train"&&gtLat(d)==="uni"?["links","rechts"]:gtKind(d)==="test"&&d.hand==="left"?["links"]:gtKind(d)==="test"&&d.hand==="right"?["rechts"]:[""];
   const out=[{t:"prep",dur:5,label:"Bereit machen"}];
-  // Unilateral: pro Wiederholung links, Pause, rechts, Pause … (gleiche Pause wie zwischen den Wiederholungen)
-  for(let s=1;s<=sets;s++){for(let r=1;r<=reps;r++){sides.forEach((side,si)=>{out.push({t:"work",dur:sec,label:"Halten"+(side?" · "+side:""),set:s,rep:r,side});
+  const sw=sides.length>1?gtSwitch(d):"rep";
+  const block=(s,side)=>{for(let r=1;r<=reps;r++){out.push({t:"work",dur:sec,label:"Halten"+(side?" · "+side:""),set:s,rep:r,side});if(r<reps&&rr)out.push({t:"rest",dur:rr,label:"Pause",set:s,rep:r,side});}};
+  if(sw==="rep"){ // links, Pause, rechts, Pause … (Pause zw. Wdh auch beim Handwechsel)
+    for(let s=1;s<=sets;s++){for(let r=1;r<=reps;r++){sides.forEach((side,si)=>{out.push({t:"work",dur:sec,label:"Halten"+(side?" · "+side:""),set:s,rep:r,side});
         const last=r===reps&&si===sides.length-1;if(!last&&rr)out.push({t:"rest",dur:rr,label:"Pause"+(sides.length>1?" → "+sides[(si+1)%sides.length]:""),set:s,rep:r,side});});}
-    if(s<sets&&rs)out.push({t:"setrest",dur:rs,label:"Satzpause",set:s});}
+      if(s<sets&&rs)out.push({t:"setrest",dur:rs,label:"Satzpause",set:s});}}
+  else if(sw==="set"){ // Satz links, Satzpause, Satz rechts, Satzpause …
+    for(let s=1;s<=sets;s++)sides.forEach((side,si)=>{block(s,side);const last=s===sets&&si===sides.length-1;if(!last&&rs)out.push({t:"setrest",dur:rs,label:"Satzpause → "+sides[(si+1)%sides.length],set:s});});}
+  else{ // alle Sätze links, dann Armwechsel, alle Sätze rechts
+    sides.forEach((side,si)=>{for(let s=1;s<=sets;s++){block(s,side);if(s<sets&&rs)out.push({t:"setrest",dur:rs,label:"Satzpause",set:s,side});}
+      if(si<sides.length-1)out.push({t:"setrest",dur:Math.max(rs,30),label:"Armwechsel → "+sides[si+1],set:sets});});}
   return out;}
 let gtT=null;
 function gtBeep(f,ms){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;gtBeep.ac=gtBeep.ac||new C();const ac=gtBeep.ac;if(ac.state==="suspended")ac.resume();
@@ -1259,10 +1269,10 @@ const ACT={
   catDel:a=>{const arr=S.strExercises;const i=arr.findIndex(x=>x.id===a.dataset.id);if(i<0)return;const it=arr.splice(i,1)[0];persist();strRenderCatalogList_();undoToast("Übung gelöscht",()=>{arr.splice(Math.min(i,arr.length),0,it);persist();strRenderCatalogList_();});},
   // Kraftmessung
   gtPresetUse:a=>{const p=gtPresets().find(x=>x.id===a.dataset.id);if(!p)return;const date=gtDraft?getDate("gt_date"):today();
-    gtDraft={kind:p.kind==="test"?"test":"train",date,program:p.program||"",hand:p.hand||"both",lat:p.lat||"bi",sets:p.sets,reps:p.reps,sec:p.sec,restRep:p.restRep,restSet:p.restSet,load:p.load,peak:null,note:p.note||"",_preset:p.id};UI.gtKind=gtDraft.kind;saveUI();render();toast("Preset „"+p.name+"“ geladen");},
+    gtDraft={kind:p.kind==="test"?"test":"train",date,program:p.program||"",hand:p.hand||"both",lat:p.lat||"bi",sw:p.sw||"rep",sets:p.sets,reps:p.reps,sec:p.sec,restRep:p.restRep,restSet:p.restSet,load:p.load,peak:null,note:p.note||"",_preset:p.id};UI.gtKind=gtDraft.kind;saveUI();render();toast("Preset „"+p.name+"“ geladen");},
   gtPresetNew:()=>{gtReadForm();const d=gtDraft;inputModal({title:"Als Preset speichern",saveLabel:"Speichern",fields:[{key:"n",label:"Name",value:[d.program,d.sets&&d.reps&&d.sec?`${d.sets}×${d.reps}×${d.sec}s`:""].filter(Boolean).join(" "),required:true}],
     onSave:v=>{const name=v.n.trim();const P=gtPresets();const ex=P.find(p=>p.name.toLowerCase()===name.toLowerCase());
-      const rec={name,kind:gtKind(d),program:d.program,hand:d.hand,lat:gtLat(d),sets:d.sets,reps:d.reps,sec:d.sec,restRep:d.restRep,restSet:d.restSet,load:d.load,note:d.note};
+      const rec={name,kind:gtKind(d),program:d.program,hand:d.hand,lat:gtLat(d),sw:gtSwitch(d),sets:d.sets,reps:d.reps,sec:d.sec,restRep:d.restRep,restSet:d.restSet,load:d.load,note:d.note};
       if(ex){if(!confirm(`Preset „${ex.name}“ gibt es schon. Überschreiben?`))return;Object.assign(ex,rec);}else P.push(Object.assign({id:uid("gp")},rec));
       persist();render();toast("Preset gespeichert");}});},
   gtPresetEdit:()=>{gtReadForm();gtPresetEdit=!gtPresetEdit;render();},
@@ -1270,10 +1280,11 @@ const ACT={
   gtPresetRename:a=>{const p=gtPresets().find(x=>x.id===a.dataset.id);if(!p)return;inputModal({title:"Preset umbenennen",fields:[{key:"n",label:"Name",value:p.name,required:true}],onSave:v=>{p.name=v.n.trim();persist();render();}});},
   gtPresetUpdate:a=>{gtReadForm();const p=gtPresets().find(x=>x.id===a.dataset.id);if(!p)return;const d=gtDraft;
     if(!confirm(`„${p.name}“ mit den aktuellen Formularwerten überschreiben?\n${[d.program,d.sets&&d.reps&&d.sec?`${d.sets}×${d.reps}×${d.sec}s`:"",d.load!=null?d.load+" kg":""].filter(Boolean).join(" · ")}`))return;
-    Object.assign(p,{kind:gtKind(d),program:d.program,hand:d.hand,lat:gtLat(d),sets:d.sets,reps:d.reps,sec:d.sec,restRep:d.restRep,restSet:d.restSet,load:d.load,note:d.note});persist();render();toast("Preset aktualisiert");},
+    Object.assign(p,{kind:gtKind(d),program:d.program,hand:d.hand,lat:gtLat(d),sw:gtSwitch(d),sets:d.sets,reps:d.reps,sec:d.sec,restRep:d.restRep,restSet:d.restSet,load:d.load,note:d.note});persist();render();toast("Preset aktualisiert");},
   gtPresetMove:a=>{const P=gtPresets();const i=+a.dataset.i,j=i+(+a.dataset.d);if(j<0||j>=P.length)return;[P[i],P[j]]=[P[j],P[i]];persist();render();},
   gtKind:a=>{gtReadForm();const k=a.dataset.v;if(gtKind(gtDraft)===k)return;UI.gtKind=k;saveUI();gtDraft=gtBlank(k);render();},
   gtLat:a=>{gtReadForm();gtDraft.lat=a.dataset.v;render();},
+  gtSw:a=>{gtReadForm();gtDraft.sw=a.dataset.v;render();},
   gtTimer:()=>{gtReadForm();gtTimerStart(gtDraft);},
   gtTStop:()=>{if(confirm("Timer beenden?"))gtTimerStop();},
   gtTPause:()=>{if(!gtT)return;if(gtT.paused){gtT.paused=false;gtT.endAt=Date.now()+gtT.remain*1000;}else{gtT.remain=Math.max(0,(gtT.endAt-Date.now())/1000);gtT.paused=true;}gtTimerRender();},
