@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tracking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<style>
+/* Tokens bewusst identisch zum Signalpult: eine App-Familie, zwei Rollen. */
+:root{
+  color-scheme:light dark;
+  --paper:#FAFAF7;--panel:#FFFFFF;--ink:#191C18;--muted:#6B7168;--faint:#9A9E94;
+  --line:#E4E5DE;--line-strong:#CFD1C7;
+  --recovery:#2E6F72;--recovery-soft:#E4F0EF;
+  --load:#9A6B12;--load-soft:#F3EBD8;
+  --pos:#3C7A33;--neg:#B23A2E;--neg-soft:#F6E3E0;
+  --focus-bg:#F1F2EC;--accent2:#7A4FB0;--accent2-soft:#EFE8F7;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#14150F;--panel:#1C1E17;--ink:#ECEDE4;--muted:#9DA294;--faint:#71766A;--line:#2C2E25;--line-strong:#3A3D31;
+  --recovery:#5FB3B4;--recovery-soft:#17322E;--load:#D9A54A;--load-soft:#332812;--pos:#6FB85F;--neg:#E4675A;--neg-soft:#3A1E1A;
+  --focus-bg:#20221A;--accent2:#B79BE0;--accent2-soft:#241A33;}}
+:root[data-theme="dark"]{
+  --paper:#14150F;--panel:#1C1E17;--ink:#ECEDE4;--muted:#9DA294;--faint:#71766A;--line:#2C2E25;--line-strong:#3A3D31;
+  --recovery:#5FB3B4;--recovery-soft:#17322E;--load:#D9A54A;--load-soft:#332812;--pos:#6FB85F;--neg:#E4675A;--neg-soft:#3A1E1A;
+  --focus-bg:#20221A;--accent2:#B79BE0;--accent2-soft:#241A33;}
+*{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;min-height:100%;padding-bottom:84px}
+.mono,.num{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:720px;margin:0 auto;padding:0 clamp(14px,4vw,24px)}
+h1,h2,h3{margin:0;letter-spacing:-.01em}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--recovery);outline-offset:2px}
+
+/* Kopf */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:color-mix(in srgb,var(--paper) 90%,transparent);backdrop-filter:saturate(140%) blur(8px);border-bottom:1px solid var(--line)}
+.top-in{display:flex;align-items:center;gap:10px;padding:12px 0 10px}
+.brand{margin-right:auto;min-width:0}
+.brand h1{font-size:18px;font-weight:700}
+.brand .tag{font-size:12px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-strong);background:var(--panel);border-radius:20px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.pill.dirty{border-color:var(--load);color:var(--load);background:var(--load-soft)}
+.pill.dirty .dot{background:var(--load)}
+.pill.clean .dot{background:var(--recovery)}
+
+/* Navigation unten (Daumenzone) */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:45;background:color-mix(in srgb,var(--paper) 94%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 6px calc(env(safe-area-inset-bottom,0px) + 6px)}
+nav.tabs .in{max-width:720px;margin:0 auto;display:flex}
+nav.tabs button{flex:1;background:none;border:0;padding:8px 2px 6px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;border-radius:10px}
+nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button[aria-current="page"]{color:var(--recovery);background:var(--recovery-soft)}
+
+/* Bausteine */
+.viewhead{margin:18px 0 12px}
+.viewhead h2{font-size:21px}
+.viewhead .sub{font-size:13px;color:var(--muted);margin-top:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 15px;margin-bottom:12px}
+.card h3{font-size:15px;margin-bottom:8px}
+.lab{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px}
+.hint{font-size:12.5px;color:var(--muted);line-height:1.5}
+.grouplab{font-size:12.5px;font-weight:700;color:var(--muted);margin:22px 2px 8px}
+.row{display:flex;gap:10px;align-items:center}
+.row.wrapok{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;background:var(--paper);border:1px solid var(--line-strong);border-radius:9px;padding:10px 11px;font-size:16px;min-height:44px}
+textarea{resize:vertical;min-height:64px}
+input[type=number]{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:600;background:var(--panel);border:1px solid var(--line-strong);border-radius:9px;padding:10px 14px;min-height:44px;cursor:pointer}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--recovery);border-color:var(--recovery);color:#fff}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;border-color:var(--line)}
+.btn.small{min-height:34px;padding:6px 10px;font-size:13px}
+.btn.block{width:100%}
+.btn.danger{color:var(--neg);border-color:color-mix(in srgb,var(--neg) 40%,var(--line))}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.stack>*+*{margin-top:10px}
+
+/* Skalen 1–5: große Treffer, Anker-Text darunter */
+.scale{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.scale button{min-height:48px;border:1px solid var(--line-strong);background:var(--paper);border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 2px}
+.scale button b{font-family:"IBM Plex Mono",monospace;font-size:17px}
+.scale button span{font-size:10.5px;color:var(--muted);line-height:1.1;text-align:center}
+.scale button[aria-pressed="true"]{background:var(--load);border-color:var(--load);color:#fff}
+.scale button[aria-pressed="true"] span{color:#fff;opacity:.9}
+.scale.vol button[aria-pressed="true"]{background:var(--recovery);border-color:var(--recovery)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line-strong);background:var(--paper);border-radius:18px;padding:7px 13px;font-size:13.5px;font-weight:600;cursor:pointer;min-height:38px}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.seg{display:flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden}
+.seg button{flex:1;border:0;border-right:1px solid var(--line);background:transparent;padding:9px 8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;min-height:40px}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--recovery-soft);color:var(--recovery)}
+
+/* Listen */
+.list{border:1px solid var(--line);border-radius:13px;background:var(--panel);overflow:hidden}
+.li{display:flex;gap:10px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line)}
+.li:last-child{border-bottom:0}
+.li .t{font-weight:600;font-size:14px}
+.li .s{font-size:12.5px;color:var(--muted)}
+.li .v{font-family:"IBM Plex Mono",monospace;font-size:14px;white-space:nowrap}
+.li button.x{border:0;background:none;color:var(--faint);font-size:18px;cursor:pointer;padding:4px 6px;min-width:34px;min-height:34px}
+.li.tap{cursor:pointer}
+.li.tap:hover{background:var(--focus-bg)}
+.empty{text-align:center;padding:22px 16px;color:var(--muted);font-size:13.5px}
+.empty .btn{margin-top:10px}
+
+/* Plan / Ziele: Phase als Farbfläche — dieselbe Sprache wie im Signalpult */
+.phase{display:inline-block;border-radius:6px;padding:3px 9px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.phase.none{border:1px dashed var(--line-strong);color:var(--faint);font-weight:600}
+.goal{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.goal:last-child{border-bottom:0}
+.goal .area{font-weight:700;font-size:14.5px}
+.goal .dims{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.goal .dim{font-size:11px;color:var(--muted);font-weight:600;margin-right:2px}
+.goal .note{grid-column:1/-1;font-size:13px;color:var(--ink);background:var(--focus-bg);border-radius:8px;padding:7px 10px;white-space:pre-wrap}
+.goal .ist{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
+.goal .ist b{color:var(--ink);font-family:"IBM Plex Mono",monospace;font-weight:600}
+.overall{border-left:4px solid var(--recovery);padding-left:12px}
+.overall .ph{margin:4px 0 6px}
+.overall .ph .phase{font-size:16px;padding:5px 12px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px 11px}
+.kpi .k{font-size:11.5px;color:var(--muted);font-weight:600}
+.kpi .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:600;margin-top:2px}
+.kpi .v small{font-size:12px;color:var(--muted);font-weight:500}
+.kpi .d{font-size:11.5px;color:var(--muted)}
+.warn{color:var(--neg)}
+
+/* Kraft */
+.exc{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:10px;background:var(--panel)}
+.exc .hd{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.exc .hd b{font-size:15px}
+.exc .last{font-size:12px;color:var(--muted);margin-bottom:8px}
+.setrow{display:grid;grid-template-columns:28px 1fr 1fr 78px 34px;gap:6px;align-items:center;margin-bottom:6px}
+.setrow .n{font-family:"IBM Plex Mono",monospace;color:var(--muted);text-align:center}
+.setrow input,.setrow select{min-height:40px;padding:7px 8px;font-size:15px}
+.sethead{display:grid;grid-template-columns:28px 1fr 1fr 78px 34px;gap:6px;font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px}
+.catbadge{font-size:11px;font-weight:700;color:var(--load);background:var(--load-soft);border-radius:5px;padding:1px 7px}
+.focusbadge{font-size:11px;font-weight:700;color:var(--accent2);background:var(--accent2-soft);border-radius:5px;padding:1px 7px}
+details.fold{border:1px solid var(--line);border-radius:13px;background:var(--panel);margin-bottom:12px}
+details.fold>summary{cursor:pointer;padding:13px 15px;font-weight:700;list-style:none}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:"+";float:right;color:var(--muted)}
+details.fold[open]>summary::after{content:"–"}
+details.fold .body{padding:0 15px 14px}
+
+/* LSI-Zahl */
+.lsi{font-family:"IBM Plex Mono",monospace;font-size:34px;font-weight:600;line-height:1}
+.lsi small{font-size:14px;color:var(--muted)}
+.spark{width:100%;height:46px;display:block}
+
+/* Tabelle Vertrag */
+.tblwrap{overflow-x:auto}
+table.contract{border-collapse:collapse;width:100%;font-size:12.5px}
+table.contract td,table.contract th{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left;vertical-align:top}
+table.contract th{color:var(--muted);font-weight:600}
+code{font-family:"IBM Plex Mono",monospace;font-size:.92em;background:var(--focus-bg);border-radius:4px;padding:1px 5px}
+
+/* Modal + Toast */
+.modal-bg{position:fixed;inset:0;background:rgba(10,12,8,.45);z-index:80;display:flex;align-items:flex-end;justify-content:center}
+@media (min-width:640px){.modal-bg{align-items:center}}
+.modal{background:var(--panel);border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:18px 18px calc(env(safe-area-inset-bottom,0px) + 18px)}
+@media (min-width:640px){.modal{border-radius:16px}}
+.modal h3{font-size:17px;margin-bottom:8px}
+.modal .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+#toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:10px;font-size:13.5px;font-weight:600;z-index:90;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+.hidden{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---- Zusätze v2 (Training-Monitor-Logik) ---- */
+.subtabs{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px}
+.subtabs button{flex:0 0 auto;border:1px solid var(--line-strong);background:var(--panel);border-radius:20px;padding:8px 14px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--muted);min-height:40px}
+.subtabs button[aria-current="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.kwb{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted);margin-top:4px}
+.fldlab{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px}
+.fldlab i{font-style:normal;font-weight:400;color:var(--faint)}
+.opts{display:flex;gap:6px;flex-wrap:wrap}
+.opt{flex:1;min-width:0;border:1px solid var(--line-strong);background:var(--paper);border-radius:10px;padding:9px 8px;font-size:13.5px;font-weight:600;cursor:pointer;min-height:42px;color:var(--ink)}
+.opt.g{background:var(--recovery);border-color:var(--recovery);color:#fff}
+.opt.y{background:var(--load);border-color:var(--load);color:#fff}
+.tchip{font-size:10.5px;font-weight:700;border-radius:5px;padding:1px 7px;white-space:nowrap}
+.tchip.weighted{color:var(--recovery);background:var(--recovery-soft)}
+.tchip.bodyweight{color:var(--load);background:var(--load-soft)}
+.tchip.hold{color:var(--accent2);background:var(--accent2-soft)}
+.strset{border-top:1px dashed var(--line);padding:8px 0 4px}
+.strset:first-child{border-top:0}
+.strrow{display:flex;align-items:center;gap:6px}
+.strrow .n{width:20px;font-family:"IBM Plex Mono",monospace;color:var(--muted);text-align:center}
+.strrow input{min-height:40px;padding:7px 8px;font-size:15px;width:74px;flex:0 0 auto}
+.strrow .x2{font-size:12px;color:var(--muted)}
+.strrow .eff{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted);margin-left:auto}
+.rir{display:flex;align-items:center;gap:5px;margin:6px 0 0 26px}
+.rir span{font-size:11px;color:var(--muted);font-weight:600;margin-right:2px}
+.rir button{border:1px solid var(--line-strong);background:var(--paper);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;min-height:32px}
+.rir button.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.meta{font-size:12px;color:var(--muted)}
+.pillb{display:inline-block;border-radius:6px;padding:1px 7px;font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600}
+.pillb.g{background:var(--recovery-soft);color:var(--recovery)}
+.pillb.y{background:var(--load-soft);color:var(--load)}
+.pillb.r{background:var(--neg-soft);color:var(--neg)}
+table.log{border-collapse:collapse;width:100%;font-size:13px}
+table.log th{font-size:11px;color:var(--muted);font-weight:600;text-align:left;padding:6px 6px;border-bottom:1px solid var(--line)}
+table.log td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.log td.v{font-family:"IBM Plex Mono",monospace;white-space:nowrap}
+table.log tr.det td{background:var(--focus-bg);font-size:12px;color:var(--muted);line-height:1.55}
+.linky{color:var(--recovery);cursor:pointer;font-weight:600}
+button.x{border:0;background:none;color:var(--faint);font-size:18px;cursor:pointer;min-width:32px;min-height:32px}
+.ftag{padding:6px 12px;border-radius:14px;border:1px solid var(--line-strong);background:transparent;font-size:12.5px;cursor:pointer;color:var(--muted);min-height:34px}
+.ftag.on{border-color:var(--recovery);background:var(--recovery-soft);color:var(--recovery);font-weight:600}
+.ftag.add{border-style:dashed}
+#toast .undo{margin-left:12px;background:none;border:0;color:inherit;font-weight:700;text-decoration:underline;cursor:pointer;pointer-events:auto}
+#toast.on{pointer-events:auto}
+.balance{border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:10px;background:var(--panel)}
+.wrow{padding:0;gap:0}
+.wbox{flex:0 0 auto;width:30px;height:30px;margin:0 4px 0 14px;border-radius:8px;border:2px solid var(--line-strong);background:var(--paper);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;cursor:pointer;color:#fff}
+.wbox.done{background:var(--recovery);border-color:var(--recovery);cursor:default}
+.wbox.skip{background:var(--faint);border-color:var(--faint)}
+.wgo{display:flex;align-items:center;gap:10px;border:0;background:none;text-align:left;padding:14px 14px 14px 10px;cursor:pointer;min-height:56px}
+.wgo:hover{background:var(--focus-bg)}
+.wgo .t{flex:1;font-weight:600;font-size:15px}
+.wn{font-family:"IBM Plex Mono",monospace;font-size:13.5px;color:var(--recovery);font-weight:600}
+.wskip{font-size:13px;color:var(--muted);font-style:italic}
+.wopen{font-size:13px;color:var(--load);font-weight:600}
+.chev{color:var(--faint);font-size:18px}
+.wgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.wcell{border:1px solid var(--line);border-radius:10px;padding:8px 6px;background:var(--panel);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;border-left-width:4px}
+.wcell span{font-family:"IBM Plex Mono",monospace;color:var(--muted)}
+.wcell.b-g{border-left-color:var(--recovery)}.wcell.b-y{border-left-color:var(--load)}.wcell.b-r{border-left-color:var(--neg)}
+.wcell.cur{outline:2px solid var(--ink);outline-offset:1px}
+.note-ta{font-size:15px;line-height:1.45;min-height:64px;width:100%;max-width:100%;box-sizing:border-box}
+.npend{font-size:12px;color:var(--accent2);font-weight:600;margin-top:4px}
+.zarea>summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.zarea>summary .zt{flex:1;min-width:110px}
+.gttimerbtn{font-weight:700;border-color:var(--recovery);color:var(--recovery)}.gttimerbtn span{font-weight:500;color:var(--muted);margin-left:4px}
+.gtt{position:fixed;inset:0;z-index:95;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 24px);background:var(--paper);color:var(--ink);text-align:center}
+.gtt.work{background:var(--load);color:#fff}.gtt.rest{background:var(--recovery);color:#fff}.gtt.setrest{background:#3D6CB0;color:#fff}
+.gtt-top{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:16px;right:16px;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:14px;opacity:.9}
+.gtt-x{border:0;background:rgba(0,0,0,.15);color:inherit;width:40px;height:40px;border-radius:20px;font-size:22px;cursor:pointer}
+.gtt-label{font-size:24px;font-weight:700}.gtt-time{font-family:"IBM Plex Mono",monospace;font-size:120px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.gtt-pos{font-size:17px;font-weight:600}.gtt-next{font-size:14px;opacity:.85}
+.gtt-bar{width:min(320px,80vw);height:8px;border-radius:4px;background:rgba(0,0,0,.18);overflow:hidden}.gtt-bar i{display:block;height:100%;background:currentColor}
+.gtt-acts{display:flex;gap:10px;margin-top:12px}.gtt-acts .btn{min-width:120px;background:rgba(255,255,255,.92);color:#191C18;border:0}
+.mkt{font-size:11px;font-weight:600;color:var(--muted)}
+.zarea>summary .zd{display:flex;align-items:center;gap:5px;font-weight:500}
+.zarea>summary .dim{font-size:11px;color:var(--muted);font-weight:600}
+.zarea>summary::after{margin-left:6px}
+.catlist .item{border-bottom:1px solid var(--line);padding:10px 0}
+.catlist .item:last-child{border-bottom:0}
+.catlist .acts{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;justify-content:flex-start}
+.catlist .acts .btn{min-height:32px;padding:4px 9px;font-size:12px}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap top-in">
+  <div class="brand"><h1>Tracking</h1><div class="tag">Resultate für die Planung</div></div>
+  <button class="pill" id="savePill" data-act="quickSave" title="Excel speichern"><span class="dot"></span><span id="savePillTxt">–</span></button>
+</div></header>
+<main class="wrap" id="view"></main>
+<nav class="tabs" aria-label="Bereiche"><div class="in" id="tabs"></div></nav>
+<div id="modalRoot"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="fileTracking" accept=".xlsx,.xls" class="hidden">
+<input type="file" id="filePlan" accept=".xlsx,.xls" class="hidden">
+<input type="file" id="fileGrip" accept=".csv,.txt,.json,.xlsx,application/json" class="hidden">
+<input type="file" id="fileJump" accept=".xlsx,.xls,.csv,.txt,.json,application/json" class="hidden" multiple>
+<script>
+"use strict";
+/* =====================================================================
+   Tracking v2 — Erfassung wie im Training Monitor
+   (Sessions · Krafttraining · Kraftmessung · Gewicht), gespeichert in tracking.xlsx
+   ===================================================================== */
+const FILE_TRACKING="tracking.xlsx", FILE_PLAN="signalpult-mappe.xlsx", FILE_MOBILITY="mobility-baseline.xlsx";
+const LS_STATE="tracking.state.v2", LS_GOALS="tracking.goals.v1", LS_UI="tracking.ui.v2";
+
+/* ---- aus dem Training Monitor ---- */
+const SESS_SPORTS=[["climb","Klettern"],["kick","Kickbox"],["other","Sonstiges"]];
+const SESS_INT_LABELS={1:"sehr leicht",2:"leicht",3:"moderat",4:"hart",5:"maximal"};
+const SESS_VOL_LABELS={1:"sehr wenig",2:"wenig",3:"mittel",4:"viel",5:"sehr viel"};
+const MEAS_PHASES=["vor Training","nach Training","in Training","Ruhetag"];
+/* STR_CATS wie im Monitor; „Griffkraft“ ergänzt, weil die Planung einen Bereich Kraft · Griffkraft hat */
+const STR_CATS=[["hinge","Hinge"],["squat","Squat"],["push","Oberkörper Push"],["pull","Oberkörper Pull"],["grip","Griffkraft"],["other","Sonstiges"]];
+const STR_TYPE_LABEL={weighted:"Gewicht",bodyweight:"Körpergewicht",hold:"Halten"};
+const RIR_BANDS=[[1,"0–2"],[3,"2–4"],[5,"4+"]];
+const PLAN_AREAS=[["gesamt","Gesamt"],["klettern","Klettern"],["velo","Velo"],["kickbox","Kickbox"],["ausdauer","Ausdauer"],["kraft_hinge","Kraft · Hinge"],["kraft_squat","Kraft · Squat"],["kraft_push","Kraft · Push"],["kraft_pull","Kraft · Pull"],["kraft_grip","Kraft · Griff"]];
+const INFO={
+  lsi:"LSI (Seitensymmetrie): Verhältnis der schwächeren zur stärkeren Körperseite. 100 % = perfekt symmetrisch, unter 90 % gilt als Defizit.",
+  weightAvg:"Ø Gewicht (alle): Mittel aller Wiegungen der letzten 7 Tage, unabhängig von den Bedingungen.",
+  weightRef:"Ø Referenzgewicht: Mittel nur der vergleichbaren Wiegungen (nüchtern und ohne Kleidung) der letzten 7 Tage — der aussagekräftigere Wert für den Verlauf."};
+
+/* =====================================================================
+   HILFSFUNKTIONEN
+   ===================================================================== */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=p=>(p||"")+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function today(){const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);}
+function num(v){if(v==null||v==="")return null;if(typeof v==="number")return isFinite(v)?v:null;const s=String(v).trim().replace(",",".");if(/^inf/i.test(s))return null;const n=parseFloat(s);return isNaN(n)?null:n;}
+function fmt(v,d){if(v==null||isNaN(v))return "–";const p=d==null?1:d;return (+v).toLocaleString("de-CH",{minimumFractionDigits:0,maximumFractionDigits:p});}
+function toISODate(v){
+  if(v==null||v==="")return null;
+  if(v instanceof Date){if(isNaN(v))return null;return new Date(v.getTime()+12*36e5).toISOString().slice(0,10);}
+  if(typeof v==="number"){if(v<20000||v>80000)return null;return new Date(Math.round((v-25569)*864e5)+12*36e5).toISOString().slice(0,10);}
+  const s=String(v).trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`;
+  m=s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);if(m)return `${m[3].length===2?"20"+m[3]:m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);if(m)return `${m[3].length===2?"20"+m[3]:m[3]}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
+  return null;}
+function weekKey(iso){const d=new Date(iso+"T00:00:00Z");d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);}
+function addDays(iso,n){const d=new Date(iso+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
+function isoWeekNo(k){const d=new Date(k+"T00:00:00Z");const th=new Date(d);th.setUTCDate(d.getUTCDate()+3-((d.getUTCDay()+6)%7));const f=new Date(Date.UTC(th.getUTCFullYear(),0,4));return 1+Math.round(((th-f)/864e5-3+((f.getUTCDay()+6)%7))/7);}
+function kwLabel(iso){if(!iso)return "";const k=weekKey(iso);return "KW "+isoWeekNo(k)+" · "+new Date(addDays(k,3)+"T00:00:00Z").getUTCFullYear();}
+const MON=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+function fmtRange(k){const a=new Date(k+"T00:00:00Z"),b=new Date(a);b.setUTCDate(a.getUTCDate()+6);return a.getUTCMonth()===b.getUTCMonth()?`${a.getUTCDate()}.–${b.getUTCDate()}. ${MON[b.getUTCMonth()]}`:`${a.getUTCDate()}. ${MON[a.getUTCMonth()]} – ${b.getUTCDate()}. ${MON[b.getUTCMonth()]}`;}
+function fmtDate(iso){if(!iso)return "–";const d=new Date(iso+"T00:00:00Z");return `${["So","Mo","Di","Mi","Do","Fr","Sa"][d.getUTCDay()]} ${d.getUTCDate()}. ${MON[d.getUTCMonth()]}`;}
+function lsi(a,b){a=num(a);b=num(b);if(!a||!b)return null;return +(Math.min(a,b)/Math.max(a,b)*100).toFixed(1);}
+const band=v=>v==null?"":v>=90?"g":v>=80?"y":"r";
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+/* =====================================================================
+   ZUSTAND
+   ===================================================================== */
+function emptyState(){return {
+  sessions:[], str:[], strExercises:[], strMaterials:[], strLocations:[], measures:[], jumps:[], weight:[], weekChecks:[], planNotes:[], gripTrain:[],
+  settings:{reflection:{climb:[],kick:[],other:[]},focusTags:{climb:[],kick:[],other:[]},defaultBodyweight:null,weekCats:{},gripPresets:[]},
+  meta:{dirty:false,lastSaved:null,fileStamp:null}};}
+function normState(x){const e=emptyState();x=Object.assign(e,x||{});x.settings=Object.assign(e.settings,x.settings||{});
+  ["reflection","focusTags"].forEach(k=>{x.settings[k]=Object.assign({climb:[],kick:[],other:[]},x.settings[k]||{});});
+  x.meta=Object.assign(emptyState().meta,x.meta||{});return x;}
+let S=normState(lsGet(LS_STATE));
+let GOALS=lsGet(LS_GOALS);
+let UI=Object.assign({tab:"woche",sess:"climb",kraft:"str",weekOffset:0,autoSave:false},lsGet(LS_UI)||{});
+function saveUI(){lsSet(LS_UI,UI);}
+function persist(markDirty){if(markDirty!==false)S.meta.dirty=true;lsSet(LS_STATE,S);updatePill();if(markDirty!==false){scheduleAutoSave();if(typeof LINK!=="undefined")LINK.changed();}}
+const sortDesc=arr=>arr.sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0);
+
+/* =====================================================================
+   KRAFT-LOGIK (1:1 aus dem Training Monitor)
+   ===================================================================== */
+const strCatName_=ck=>{const c=STR_CATS.find(x=>x[0]===ck);return c?c[1]:ck;};
+const strExById_=id=>S.strExercises.find(x=>x.id===id);
+function strBwCoeffDefault_(name){
+  const DEF=[[/klimmzug|pull.?up|chin.?up|muscle.?up/,1.0],[/dip|barren/,1.0],[/liege|push.?up|liegestütz/,0.64],[/pike|handstand/,0.9],
+    [/pistol|einbein.*kniebeuge|shrimp/,0.85],[/kniebeuge|squat|ausfall|lunge|step.?up/,0.7],[/ruder|row|inverted|australian/,0.6],
+    [/hip.?thrust|glute.?bridge|brücke/,0.55],[/plank|planke|hollow|l.?sit|hang|hängen|wall.?sit|halt/,0.6],[/crunch|sit.?up|leg.?raise|beinheben|bauch/,0.4],[/nordic|beinbeuger.*körper/,0.7]];
+  const n=String(name||"").toLowerCase();for(const [re,c] of DEF)if(re.test(n))return c;return 0.65;}
+/* Körpergewicht am Datum: letzte Messung davor, sonst nächstgelegene, sonst Standard */
+function bwForDate_(dateStr){
+  const log=S.weight.filter(w=>w&&w.date&&+w.kg>0);
+  if(log.length){let onBefore=null,nearest=null,nd=Infinity;const ref=new Date((dateStr||today())+"T00:00:00");
+    log.forEach(w=>{if(w.date<=dateStr){if(!onBefore||w.date>onBefore.date)onBefore=w;}const diff=Math.abs(new Date(w.date+"T00:00:00")-ref);if(diff<nd){nd=diff;nearest=w;}});
+    const pick=onBefore||nearest;if(pick)return +pick.kg;}
+  const def=+S.settings.defaultBodyweight;return def>0?def:null;}
+const strLoadType_=ex=>(ex&&ex.loadType)||"weighted";
+function strEffLoad_(ex,st,bw){const lt=strLoadType_(ex);if(lt==="weighted")return (+st.kg||0);const coeff=(ex.bwCoeff!=null?+ex.bwCoeff:0.65);return (bw!=null?bw*coeff:0)+(+st.addedKg||0);}
+function strSetKg_(w,ex,st){if(strLoadType_(ex)==="hold")return null;const bw=(w&&w.bw!=null)?+w.bw:bwForDate_(w&&w.date);return strEffLoad_(ex,st,bw);}
+const strSetReps_=(ex,st)=>strLoadType_(ex)==="hold"?null:(+st.reps||0);
+function e1rm_(kg,reps){kg=+kg;reps=+reps;if(!(kg>0)||!(reps>=1)||reps>5)return null;if(reps===1)return kg;return kg*(1+reps/30);}
+function e1rmRir_(kg,reps,rir){kg=+kg;reps=+reps;if(rir==null||rir==="")return null;rir=+rir;if(!(rir>=0))return null;const eff=reps+rir;if(!(kg>0)||!(eff>=1)||eff>5)return null;if(eff===1)return kg;return kg*(1+eff/30);}
+const strExKey_=ex=>ex.exerciseId||("name:"+(ex.name||""));
+function strEach_(exKey,fn){S.str.forEach(w=>(w.exercises||[]).forEach(ex=>{if(strExKey_(ex)===exKey)fn(w,ex);}));}
+function strTested_(exKey,fn){const ce=strExById_(exKey);if(ce&&Array.isArray(ce.tested))ce.tested.forEach(t=>{if(t&&+t.kg>0)fn(+t.kg);});}
+function strBestPR_(exKey){let best=null;strEach_(exKey,(w,ex)=>(ex.sets||[]).forEach(st=>{const e=e1rm_(strSetKg_(w,ex,st),strSetReps_(ex,st));if(e!=null&&(best==null||e>best))best=e;}));strTested_(exKey,kg=>{if(best==null||kg>best)best=kg;});return best;}
+function strBestPRRir_(exKey){let best=null;strEach_(exKey,(w,ex)=>(ex.sets||[]).forEach(st=>{const e=e1rmRir_(strSetKg_(w,ex,st),strSetReps_(ex,st),st.rir);if(e!=null&&(best==null||e>best))best=e;}));strTested_(exKey,kg=>{if(best==null||kg>best)best=kg;});return best;}
+function strBestReps_(exKey,onlyBw){let best=null;strEach_(exKey,(w,ex)=>{if(strLoadType_(ex)==="hold")return;(ex.sets||[]).forEach(st=>{if(onlyBw&&strLoadType_(ex)==="bodyweight"&&(+st.addedKg||0)>0)return;const r=+st.reps||0;if(r>0&&(best==null||r>best))best=r;});});return best;}
+function strBestHold_(exKey){let best=null;strEach_(exKey,(w,ex)=>{if(strLoadType_(ex)!=="hold")return;(ex.sets||[]).forEach(st=>{const s=+st.sec||0;if(s>0&&(best==null||s>best))best=s;});});return best;}
+/* Tonnage/Ø-Last eines Eintrags (Halten zählt nicht, unilateral ×2) */
+function strEntryVol_(w){let vol=0,reps=0;(w.exercises||[]).forEach(ex=>{if(strLoadType_(ex)==="hold")return;const m=ex.unilateral?2:1;(ex.sets||[]).forEach(st=>{const r=+st.reps||0;const kg=strSetKg_(w,ex,st)||0;vol+=r*kg*m;reps+=r;});});
+  return {vol:vol||null,inten:reps?+(vol/reps).toFixed(1):null};}
+const strMaterials=()=>S.strMaterials;
+const strLocations=()=>S.strLocations;
+const strLocationById_=id=>S.strLocations.find(l=>l.id===id)||null;
+const strExMaterials_=ex=>Array.isArray(ex&&ex.materials)?ex.materials:[];
+function strExAvailableAt_(ex,loc){if(!loc)return true;const have=new Set(loc.materials||[]);return strExMaterials_(ex).every(m=>have.has(m));}
+
+/* Sessions */
+const sessionsForSport_=sp=>S.sessions.filter(x=>x.sport===sp);
+const sessReflectionSet_=sp=>S.settings.reflection[sp]||[];
+const sessFocusReg_=sp=>S.settings.focusTags[sp]||[];
+function sessAllFocusTags_(sp){const s=new Set(sessFocusReg_(sp));sessionsForSport_(sp).forEach(x=>(x.focusTags||[]).forEach(t=>s.add(t)));return [...s].sort((a,b)=>a.localeCompare(b,"de"));}
+const sessTagLabel_=sp=>sp==="other"?"Sportart":"Fokus";
+const sportLabel=k=>(SESS_SPORTS.find(x=>x[0]===k)||[0,k])[1];
+function sportKeyFromLabel(l){l=String(l||"").toLowerCase();if(/kletter|boulder|climb/.test(l))return "climb";if(/kick|box/.test(l))return "kick";return "other";}
+
+/* Gewicht: Wochenwerte wie im Monitor (letzte 7 Kalendertage) */
+function weeklyWeightStats(){const wkAgo=addDays(today(),-7);const inW=S.weight.filter(w=>w.date>=wkAgo);
+  const r=a=>a.length?+(avg(a)).toFixed(1):null;return {avgAll:r(inW.map(w=>w.kg)),avgRef:r(inW.filter(w=>w.cond&&w.cond.fasted===true&&w.cond.clothed===false).map(w=>w.kg))};}
+
+/* =====================================================================
+   EXCEL — tracking.xlsx (Blattnamen & Spaltentitel = Vertrag mit der Planung)
+   ===================================================================== */
+const HEAD_ST={font:{bold:true,color:{rgb:"FFFFFF"}},fill:{patternType:"solid",fgColor:{rgb:"2E6F72"}},alignment:{vertical:"center",wrapText:true}};
+const HEAD_DER={font:{bold:true,color:{rgb:"FFFFFF"}},fill:{patternType:"solid",fgColor:{rgb:"9A9E94"}},alignment:{vertical:"center",wrapText:true}};
+const B=v=>v==null?"":v;
+const yn=v=>v===true?"ja":v===false?"nein":"";
+function parseYn(v){const s=String(v==null?"":v).trim().toLowerCase();if(/^(ja|j|yes|y|x|1|true)$/.test(s))return true;if(/^(nein|n|no|0|false)$/.test(s))return false;return null;}
+const list=v=>String(v==null?"":v).split(/[;]/).map(x=>x.trim()).filter(Boolean);
+function makeSheet(headers,rows,widths,derived){
+  const ws=XLSX.utils.aoa_to_sheet([headers].concat(rows));
+  headers.forEach((h,c)=>{const r=XLSX.utils.encode_cell({r:0,c});if(ws[r])ws[r].s=(derived&&derived.includes(h))?HEAD_DER:HEAD_ST;});
+  ws["!cols"]=(widths||headers.map(()=>14)).map(w=>({wch:w}));
+  if(rows.length)ws["!autofilter"]={ref:XLSX.utils.encode_range({r:0,c:0},{r:rows.length,c:headers.length-1})};
+  return ws;}
+const asc=(a,b)=>a.date<b.date?-1:a.date>b.date?1:0;
+const rirTxt=v=>v==null||v===""?"":(RIR_BANDS.find(b=>b[0]===+v)||[0,String(v)])[1];
+function rirParse(v){if(v==null||v==="")return null;const s=String(v).trim();if(/^4\+|^5/.test(s))return 5;if(/^2\s*[–-]\s*4|^3/.test(s))return 3;if(/^0\s*[–-]\s*2|^[012]$/.test(s))return 1;if(/^4$/.test(s))return 3;const n=num(s);return n==null?null:(n<=2?1:n<=4?3:5);}
+
+function buildWorkbook(){
+  const wb=XLSX.utils.book_new();
+  const info=[["Tracking — Excel-Mappe"],[""],
+    ["Diese Datei ist die Wahrheit: in Excel/Sheets bearbeiten, danach in der App wieder laden."],
+    ["Blaue Spalten = Eingaben. Graue Spalten rechnet die App beim Laden neu (z. B. LSI, Tonnage)."],
+    ["Neue Zeilen: ID leer lassen. Datum als 2026-09-24 oder 24.09.2026. Listen mit Semikolon trennen."],
+    ["Blattnamen und Spaltentitel nicht umbenennen — die Planung (Signalpult) liest sie."],[""],
+    ["Blatt","Inhalt","Skala / Hinweis"],
+    ["Sessions","Klettern, Kickbox, Sonstiges","Intensität 1–5 (sehr leicht … maximal) · Volumen 1–5 (sehr wenig … sehr viel) · Sportart bei Sonstiges = Fokus-Tags"],
+    ["Technik-Reflexion","Antworten je Session und Frage","Frage als Snapshot — alte Einträge bleiben lesbar, wenn Fragen sich ändern"],
+    ["Kraft-Einträge","ein Eintrag = eine Trainingswoche (wie im Training Monitor)","Anzahl Sessions · Trainingsort · Körpergewicht-Snapshot"],
+    ["Kraft-Sätze","ein Satz pro Zeile","Gewicht: Wdh × kg · Körpergewicht: Wdh (+ Zusatz-kg, negativ = Assistenz) · Halten: Sek (+ Zusatz-kg) · RIR: 0–2 / 2–4 / 4+"],
+    ["Kraft-Katalog","Katalog","Lasttyp Gewicht/Körpergewicht/Halten · KG-Faktor % · unilateral = Tonnage ×2 · Material & getestete 1RM mit Semikolon"],
+    ["Trainingsorte","Orte mit vorhandenem Material","filtert die Übungsauswahl"],
+    ["Kraftmessung","Griffkraft L/R mit Phase","Phase: vor Training, nach Training, in Training, Ruhetag · LSI = schwächere ÷ stärkere Seite × 100"],
+    ["Sprung","Sprungsensor je Session und Bein","cm · RSI · W · ms · mm"],
+    ["Gewicht","Körpergewicht","Bedingungen ja/nein bzw. mit/ohne; leer = nicht angegeben · Referenz = nüchtern + ohne Kleidung"],
+    ["Tracking-Einstellungen","Reflexionsfragen, Fokus-Tags, Standard-Körpergewicht, Wochenübersicht",""],[""],["Exportiert",new Date().toLocaleString("de-CH")]];
+  const wsI=XLSX.utils.aoa_to_sheet(info);wsI["!cols"]=[{wch:18},{wch:48},{wch:90}];if(wsI.A1)wsI.A1.s={font:{bold:true,sz:14}};["A8","B8","C8"].forEach(r=>{if(wsI[r])wsI[r].s=HEAD_ST;});
+  XLSX.utils.book_append_sheet(wb,wsI,"Tracking-Info");
+
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Datum","Sportart","Intensität","Volumen","Fokus-Tags","Fokus-Notiz","ID"],
+    S.sessions.slice().sort(asc).map(s=>[s.date,sportLabel(s.sport),B(s.intensity),B(s.volume),(s.focusTags||[]).join("; "),s.focusNote||"",s.id]),[12,12,11,10,28,36,16]),"Sessions");
+  const tech=[];S.sessions.slice().sort(asc).forEach(s=>(s.technique||[]).forEach(t=>tech.push([s.date,sportLabel(s.sport),t.q||"",t.a||"",t.qid||"",s.id])));
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Datum","Sportart","Frage","Antwort","Frage-ID","Session-ID"],tech,[12,12,40,50,14,16]),"Technik-Reflexion");
+
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Eintrag-ID","Datum","Anzahl Sessions","Trainingsort","Körpergewicht (kg)","Notiz","Tonnage (kg)","Ø Last (kg)"],
+    S.str.slice().sort(asc).map(w=>{const v=strEntryVol_(w);return [w.id,w.date,B(w.n),w.location||"",B(w.bw),w.note||"",v.vol!=null?Math.round(v.vol):"",B(v.inten)];}),[16,12,14,16,16,30,12,11],["Tonnage (kg)","Ø Last (kg)"]),"Kraft-Einträge");
+  const sets=[];S.str.slice().sort(asc).forEach(w=>(w.exercises||[]).forEach(ex=>(ex.sets||[]).forEach((st,i)=>{const lt=strLoadType_(ex);
+    sets.push([w.date,w.id,ex.name,strCatName_(ex.category),STR_TYPE_LABEL[lt],ex.unilateral?"ja":"nein",lt==="weighted"?"":Math.round((ex.bwCoeff!=null?ex.bwCoeff:0.65)*100),i+1,
+      lt==="hold"?"":B(st.reps),lt==="weighted"?B(st.kg):"",lt==="weighted"?"":B(st.addedKg),lt==="hold"?B(st.sec):"",rirTxt(st.rir),ex.exerciseId||""]);})));
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Datum","Eintrag-ID","Übung","Kategorie","Lasttyp","Unilateral","KG-Faktor %","Satz","Wdh","kg","Zusatz-kg","Sek","RIR","Übung-ID"],sets,[12,16,24,16,14,10,11,6,6,8,10,6,7,14]),"Kraft-Sätze");
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Übung-ID","Übung","Kategorie","Lasttyp","KG-Faktor %","Unilateral","Material","Getestete 1RM","Fokus"],
+    S.strExercises.map(e=>[e.id,e.name,strCatName_(e.category),STR_TYPE_LABEL[strLoadType_(e)],strLoadType_(e)==="weighted"?"":Math.round((e.bwCoeff!=null?e.bwCoeff:0.65)*100),e.unilateral?"ja":"nein",
+      strExMaterials_(e).join("; "),(e.tested||[]).map(t=>t.date+": "+t.kg).join("; "),e.focus?"ja":"nein"]),[14,26,16,14,11,10,28,28,8]),"Kraft-Katalog");
+  const locRows=S.strLocations.map(l=>[l.name,(l.materials||[]).join("; ")]);
+  S.strMaterials.filter(m=>!S.strLocations.some(l=>(l.materials||[]).includes(m))).forEach(m=>locRows.push(["(ohne Ort)",m]));
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Trainingsort","Material"],locRows,[20,60]),"Trainingsorte");
+
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Datum","Phase","Griff L (kg)","Griff R (kg)","Griff LSI %","Notiz","ID"],
+    S.measures.slice().sort(asc).map(m=>[m.date,m.phase||"",B(m.gl),B(m.gr),B(lsi(m.gl,m.gr)),m.note||"",m.id]),[12,14,12,12,11,30,16],["Griff LSI %"]),"Kraftmessung");
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Datum","Zeit","Bein","Drill","Zusatzlast (kg)","Wdh","Höhe best (cm)","Höhe Ø (cm)","RSI best","RSI Ø","Ø Leistung (W)","Peak Power (W)","TTPV best (ms)","TTPV Ø (ms)","Kniebeugentiefe (mm)","Quelle","ID"],
+    S.jumps.slice().sort((a,b)=>(a.date+a.time)<(b.date+b.time)?-1:1).map(j=>[j.date,j.time||"",j.leg==="left"?"links":j.leg==="right"?"rechts":"beidbeinig",j.drill||"",B(j.weight_kg),B(j.reps),B(j.best),B(j.mean),B(j.rsi),B(j.rsi_mean),B(j.mean_power_w),B(j.peak_power_w),B(j.ttpv_ms),B(j.ttpv_mean_ms),B(j.squat_mm),j.source||"",j.id]),
+    [12,7,11,10,13,6,13,11,9,8,13,13,13,11,17,24,16]),"Sprung");
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Datum","Zeit","Art","Quelle","Programm","Hand / Ausführung","Sätze","Wdh","Sek/Wdh","Pause Wdh (s)","Satzpause (s)","Ø Last (kg)","Peak (kg)","TUT (s)","Volumen (kg·s)","Intensität (% MVC)","Im Zielband (%)","Notiz","Sensor-ID","ID"],
+    (S.gripTrain||[]).slice().sort((a,b)=>(a.date+(a.time||""))<(b.date+(b.time||""))?-1:1).map(g=>{const c=gtCalc(g);return [g.date,g.time||"",gtKind(g)==="test"?"Test":"Training",g.source==="sensor"?"Sensor":"manuell",g.program||"",gtSideLabel(g),B(g.sets),B(g.reps),B(g.sec),B(g.restRep),B(g.restSet),B(g.load),B(g.peak),B(c.tut),B(c.vol),B(g.mvc),B(g.band),g.note||"",g.sensorId||"",g.id];}),
+    [12,7,9,9,16,16,7,6,8,12,12,11,9,8,14,16,14,24,14,14],["TUT (s)","Volumen (kg·s)"]),"Griff-Training");
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Preset","Art","Programm","Hand / Ausführung","Sätze","Wdh","Sek/Wdh","Pause Wdh (s)","Satzpause (s)","Ø Last (kg)","Notiz","ID"],
+    (S.settings.gripPresets||[]).map(p=>[p.name,p.kind==="test"?"Test":"Training",p.program||"",gtSideLabel(p),B(p.sets),B(p.reps),B(p.sec),B(p.restRep),B(p.restSet),B(p.load),p.note||"",p.id]),[20,9,16,16,7,6,8,12,12,11,24,12]),"Griff-Presets");
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Datum","Gewicht (kg)","Nüchtern","nach WC","Kleidung","Notiz","ID"],
+    S.weight.slice().sort(asc).map(w=>{const c=w.cond||{};return [w.date,B(w.kg),yn(c.fasted),yn(c.toilet),c.clothed===true?"mit":c.clothed===false?"ohne":"",w.note||"",w.id];}),[12,12,10,9,10,30,16]),"Gewicht");
+  const setRows=[["Standard-Körpergewicht (kg)","",B(S.settings.defaultBodyweight),""]];
+  SESS_SPORTS.forEach(([k,l])=>{sessReflectionSet_(k).forEach(q=>setRows.push(["Reflexionsfrage",l,q.q,q.id]));sessFocusReg_(k).forEach(t=>setRows.push([k==="other"?"Sportart":"Fokus-Tag",l,t,""]));});
+  WEEK_CATS.forEach(c=>setRows.push(["Wochenübersicht",c.label,S.settings.weekCats[c.key]===false?"aus":"an",c.key]));
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Typ","Bereich","Wert","ID"],setRows,[26,12,50,14]),"Tracking-Einstellungen");
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Woche (Montag)","KW","Bereich","Dimension","Notiz","Basis (Planung)","Geändert","Bereich-Key"],
+    S.planNotes.slice().sort((a,b)=>a.wk<b.wk?-1:a.wk>b.wk?1:0).map(n=>[n.wk,"KW"+isoWeekNo(n.wk),areaLabel(n.area),dimLabel(n.dim),n.text,n.base||"",n.editedAt?new Date(n.editedAt).toLocaleString("de-CH"):"",n.area]),[15,7,16,13,50,40,17,12],["Basis (Planung)"]),"Ziele-Notizen");
+  XLSX.utils.book_append_sheet(wb,makeSheet(["Woche (Montag)","KW","Bereich","Status","Notiz","Bereich-Key"],
+    S.weekChecks.slice().sort((a,b)=>a.wk<b.wk?-1:a.wk>b.wk?1:0).map(c=>{const cat=WEEK_CATS.find(x=>x.key===c.cat)||{label:c.cat,none:""};return [c.wk,"KW"+isoWeekNo(c.wk),cat.label,c.note||cat.none,"",c.cat];}),[15,7,16,18,30,12]),"Wochen-Check");
+  return wb;}
+const workbookBytes=()=>XLSX.write(buildWorkbook(),{bookType:"xlsx",type:"array"});
+
+/* neue Blattnamen bevorzugen; alte nur, wenn sie wirklich von der Tracking-App stammen (Spalte vorhanden) */
+function trkSheet(wb,neu,alt,col){if(wb.Sheets[neu])return neu;const ws=wb.Sheets[alt];if(!ws)return neu;const h=(XLSX.utils.sheet_to_json(ws,{header:1,defval:""})[0]||[]).map(x=>String(x).trim());return h.includes(col)?alt:neu;}
+const TRACK_SHEETS=["Tracking-Info","Sessions","Technik-Reflexion","Kraft-Einträge","Kraft-Sätze","Kraft-Katalog","Trainingsorte","Kraftmessung","Griff-Training","Griff-Presets","Sprung","Gewicht","Tracking-Einstellungen","Ziele-Notizen","Wochen-Check"];
+function sheetObjs(wb,name){const ws=wb.Sheets[name];if(!ws)return [];return XLSX.utils.sheet_to_json(ws,{defval:"",raw:true}).map(r=>{const o={};Object.keys(r).forEach(k=>o[String(k).trim()]=r[k]);return o;});}
+function catKey(l){l=String(l||"").toLowerCase();const hit=STR_CATS.find(c=>c[1].toLowerCase()===l||c[0]===l);if(hit)return hit[0];if(/griff|grip/.test(l))return "grip";if(/push/.test(l))return "push";if(/pull/.test(l))return "pull";if(/squat/.test(l))return "squat";if(/hinge/.test(l))return "hinge";return "other";}
+function ltKey(l){l=String(l||"").toLowerCase();if(/halt|hold/.test(l))return "hold";if(/körper|bodyw/.test(l))return "bodyweight";return "weighted";}
+function parseTrackingWb(wb){
+  const known=["Sessions","Kraft-Sätze","Kraftmessung","Gewicht","Sprung"];
+  if(!known.some(n=>wb.SheetNames.includes(n))||!wb.SheetNames.includes("Kraft-Einträge")&&!wb.SheetNames.includes("Sessions"))throw new Error("Das ist keine Tracking-Mappe (Blätter „Sessions“, „Kraft-Einträge“ … fehlen).");
+  const N=emptyState();const issues=[];const idOr=(v,p)=>String(v||"").trim()||uid(p);
+  // Einstellungen
+  sheetObjs(wb,trkSheet(wb,"Tracking-Einstellungen","Einstellungen","Typ")).forEach(r=>{const t=String(r["Typ"]||"");const sp=sportKeyFromLabel(r["Bereich"]);const v=String(r["Wert"]==null?"":r["Wert"]).trim();
+    if(/körpergewicht/i.test(t)){N.settings.defaultBodyweight=num(v);return;} if(!v)return;
+    if(/reflexion/i.test(t))N.settings.reflection[sp].push({id:idOr(r["ID"],"q"),q:v});
+    else if(/tag|sportart/i.test(t)&&!N.settings.focusTags[sp].includes(v))N.settings.focusTags[sp].push(v);});
+  // Sessions + Technik
+  const techBy={};sheetObjs(wb,"Technik-Reflexion").forEach(r=>{const sid=String(r["Session-ID"]||"").trim();if(!sid)return;(techBy[sid]=techBy[sid]||[]).push({qid:String(r["Frage-ID"]||"").trim()||uid("q"),q:String(r["Frage"]||""),a:String(r["Antwort"]||"")});});
+  sheetObjs(wb,"Sessions").forEach((r,i)=>{const d=toISODate(r["Datum"]);if(!d){if(String(r["Sportart"]||"").trim())issues.push(`Sessions Zeile ${i+2}: Datum unlesbar`);return;}
+    const c=v=>{v=num(v);return v==null?null:Math.max(1,Math.min(5,Math.round(v)));};const id=idOr(r["ID"],"ss");
+    N.sessions.push({id,date:d,sport:sportKeyFromLabel(r["Sportart"]),intensity:c(r["Intensität"]),volume:c(r["Volumen"]),technique:techBy[id]||[],focusTags:list(r["Fokus-Tags"]).map(t=>t.replace(/^#/,"")),focusNote:String(r["Fokus-Notiz"]||"")});});
+  sortDesc(N.sessions);
+  // Katalog, Orte
+  sheetObjs(wb,trkSheet(wb,"Kraft-Katalog","Kraft-Übungen","Übung-ID")).forEach(r=>{const name=String(r["Übung"]||"").trim();if(!name)return;const lt=ltKey(r["Lasttyp"]);const f=num(r["KG-Faktor %"]);
+    const e={id:idOr(r["Übung-ID"],"sx"),name,category:catKey(r["Kategorie"]),unilateral:parseYn(r["Unilateral"])===true,loadType:lt,materials:list(r["Material"]),
+      tested:list(r["Getestete 1RM"]).map(x=>{const m=x.split(":");return {date:toISODate(m[0])||today(),kg:num(m[1])};}).filter(t=>t.kg>0),focus:parseYn(r["Fokus"])===true};
+    if(lt!=="weighted")e.bwCoeff=f>0?f/100:strBwCoeffDefault_(name);N.strExercises.push(e);e.materials.forEach(m=>{if(!N.strMaterials.includes(m))N.strMaterials.push(m);});});
+  sheetObjs(wb,"Trainingsorte").forEach(r=>{const n=String(r["Trainingsort"]||"").trim();const mats=list(r["Material"]);mats.forEach(m=>{if(!N.strMaterials.includes(m))N.strMaterials.push(m);});
+    if(n&&n!=="(ohne Ort)")N.strLocations.push({id:uid("loc"),name:n,materials:mats});});
+  // Kraft-Einträge + Sätze
+  const entries={};sheetObjs(wb,"Kraft-Einträge").forEach(r=>{const d=toISODate(r["Datum"]);if(!d)return;const id=idOr(r["Eintrag-ID"],"sw");const loc=String(r["Trainingsort"]||"").trim();const l=N.strLocations.find(x=>x.name===loc);
+    entries[id]={id,date:d,bw:num(r["Körpergewicht (kg)"]),exercises:[],locationId:l?l.id:null,location:loc||null,n:num(r["Anzahl Sessions"])||0,note:String(r["Notiz"]||"")};});
+  sheetObjs(wb,"Kraft-Sätze").forEach((r,i)=>{const d=toISODate(r["Datum"]);const nm=String(r["Übung"]||"").trim();if(!d||!nm){if(nm)issues.push(`Kraft-Sätze Zeile ${i+2}: Datum fehlt`);return;}
+    let eid=String(r["Eintrag-ID"]||"").trim();if(!eid||!entries[eid]){const same=Object.values(entries).find(w=>w.date===d);eid=eid||(same?same.id:uid("sw"));if(!entries[eid])entries[eid]={id:eid,date:d,bw:null,exercises:[],locationId:null,location:null,n:0,note:""};}
+    const w=entries[eid];let cat=N.strExercises.find(e=>e.id===String(r["Übung-ID"]||"").trim())||N.strExercises.find(e=>e.name.toLowerCase()===nm.toLowerCase());
+    if(!cat){const lt=ltKey(r["Lasttyp"]);cat={id:uid("sx"),name:nm,category:catKey(r["Kategorie"]),unilateral:parseYn(r["Unilateral"])===true,loadType:lt,materials:[],tested:[]};if(lt!=="weighted")cat.bwCoeff=num(r["KG-Faktor %"])>0?num(r["KG-Faktor %"])/100:strBwCoeffDefault_(nm);N.strExercises.push(cat);}
+    let ex=w.exercises.find(x=>x.exerciseId===cat.id);
+    if(!ex){const lt=r["Lasttyp"]?ltKey(r["Lasttyp"]):cat.loadType;const f=num(r["KG-Faktor %"]);ex={exerciseId:cat.id,name:cat.name,category:r["Kategorie"]?catKey(r["Kategorie"]):cat.category,unilateral:r["Unilateral"]!==""?parseYn(r["Unilateral"])===true:!!cat.unilateral,loadType:lt,sets:[]};
+      if(lt!=="weighted")ex.bwCoeff=f>0?f/100:(cat.bwCoeff!=null?cat.bwCoeff:0.65);w.exercises.push(ex);}
+    const lt=ex.loadType,rir=rirParse(r["RIR"]);
+    if(lt==="hold")ex.sets.push({sec:num(r["Sek"])||0,addedKg:num(r["Zusatz-kg"])||0,rir});
+    else if(lt==="bodyweight")ex.sets.push({reps:num(r["Wdh"])||0,addedKg:num(r["Zusatz-kg"])||0,rir});
+    else ex.sets.push({reps:num(r["Wdh"])||0,kg:num(r["kg"])||0,rir});});
+  N.str=sortDesc(Object.values(entries).filter(w=>w.exercises.length||w.note||w.n));
+  // Messungen
+  sheetObjs(wb,"Kraftmessung").forEach((r,i)=>{const d=toISODate(r["Datum"]);const gl=num(r["Griff L (kg)"]),gr=num(r["Griff R (kg)"]);if(!d||(gl==null&&gr==null)){if(gl!=null||gr!=null)issues.push(`Kraftmessung Zeile ${i+2}: Datum unlesbar`);return;}
+    const ph=MEAS_PHASES.find(p=>p.toLowerCase()===String(r["Phase"]||"").trim().toLowerCase())||String(r["Phase"]||"").trim();
+    N.measures.push({id:idOr(r["ID"],"m"),date:d,phase:ph,gl,gr,note:String(r["Notiz"]||"")});});
+  sortDesc(N.measures);
+  sheetObjs(wb,"Sprung").forEach(r=>{const d=toISODate(r["Datum"]);if(!d)return;const b=String(r["Bein"]||"").toLowerCase();
+    N.jumps.push({id:idOr(r["ID"],"j"),date:d,time:String(r["Zeit"]||""),leg:/^l/.test(b)?"left":/^r/.test(b)?"right":"both",drill:String(r["Drill"]||""),weight_kg:num(r["Zusatzlast (kg)"]),reps:num(r["Wdh"]),
+      best:num(r["Höhe best (cm)"]),mean:num(r["Höhe Ø (cm)"]),rsi:num(r["RSI best"]),rsi_mean:num(r["RSI Ø"]),mean_power_w:num(r["Ø Leistung (W)"]),peak_power_w:num(r["Peak Power (W)"]),
+      ttpv_ms:num(r["TTPV best (ms)"]),ttpv_mean_ms:num(r["TTPV Ø (ms)"]),squat_mm:num(r["Kniebeugentiefe (mm)"]),source:String(r["Quelle"]||"")});});
+  sheetObjs(wb,"Gewicht").forEach((r,i)=>{const d=toISODate(r["Datum"]);const kg=num(r["Gewicht (kg)"]);if(!d||kg==null){if(kg!=null)issues.push(`Gewicht Zeile ${i+2}: Datum unlesbar`);return;}
+    const k=String(r["Kleidung"]||"").trim().toLowerCase();N.weight.push({id:idOr(r["ID"],"w"),date:d,kg,cond:{fasted:parseYn(r["Nüchtern"]),toilet:parseYn(r["nach WC"]),clothed:k==="mit"?true:k==="ohne"?false:parseYn(k)},note:String(r["Notiz"]||"")});});
+  sortDesc(N.weight);
+  sheetObjs(wb,trkSheet(wb,"Tracking-Einstellungen","Einstellungen","Typ")).forEach(r=>{if(/wochen/i.test(String(r["Typ"]||""))){const k=String(r["ID"]||"").trim();if(k)N.settings.weekCats[k]=!/aus|nein|off/i.test(String(r["Wert"]||""));}});
+  sheetObjs(wb,"Griff-Presets").forEach(r=>{const n=String(r["Preset"]||"").trim();if(!n)return;const h=String(r["Hand"]||"").toLowerCase();
+    const hs=String(r["Hand / Ausführung"]||r["Hand"]||"").toLowerCase();const kind=/test/i.test(String(r["Art"]||""))?"test":"train";
+    N.settings.gripPresets.push({id:idOr(r["ID"],"gp"),name:n,kind,program:String(r["Programm"]||""),hand:/^l/.test(hs)?"left":/^r/.test(hs)?"right":"both",lat:/^uni/.test(hs)||(kind==="train"&&/^(l|r)/.test(hs))?"uni":"bi",sets:num(r["Sätze"]),reps:num(r["Wdh"]),sec:num(r["Sek/Wdh"]),restRep:num(r["Pause Wdh (s)"]),restSet:num(r["Satzpause (s)"]),load:num(r["Ø Last (kg)"]),note:String(r["Notiz"]||"")});});
+  sheetObjs(wb,"Griff-Training").forEach(r=>{const d=toISODate(r["Datum"]);if(!d)return;const h=String(r["Hand / Ausführung"]||r["Hand"]||"").toLowerCase();const kind=/test/i.test(String(r["Art"]||""))?"test":"train";
+    N.gripTrain.push({id:idOr(r["ID"],"gt"),kind,lat:/^uni/.test(h)||(kind==="train"&&/^(l|r)/.test(h))?"uni":"bi",restRep:num(r["Pause Wdh (s)"]),restSet:num(r["Satzpause (s)"]),date:d,time:String(r["Zeit"]||""),source:/sensor/i.test(String(r["Quelle"]||""))?"sensor":"manual",program:String(r["Programm"]||""),hand:/^l/.test(h)?"left":/^r/.test(h)?"right":"both",
+      sets:num(r["Sätze"]),reps:num(r["Wdh"]),sec:num(r["Sek/Wdh"]),load:num(r["Ø Last (kg)"]),peak:num(r["Peak (kg)"]),tut:/sensor/i.test(String(r["Quelle"]||""))?num(r["TUT (s)"]):null,vol:/sensor/i.test(String(r["Quelle"]||""))?num(r["Volumen (kg·s)"]):null,mvc:num(r["Intensität (% MVC)"]),band:num(r["Im Zielband (%)"]),note:String(r["Notiz"]||""),sensorId:String(r["Sensor-ID"]||"")});});
+  sheetObjs(wb,"Ziele-Notizen").forEach(r=>{const d=toISODate(r["Woche (Montag)"]);const area=String(r["Bereich-Key"]||"").trim();if(!d||!area)return;
+    const dl=String(r["Dimension"]||"").toLowerCase();const dim=(area==="gesamt"||area==="balance")?"all":dl.startsWith("vol")?"vol":dl.startsWith("int")?"int":"all";
+    N.planNotes.push({wk:weekKey(d),area,dim,text:String(r["Notiz"]==null?"":r["Notiz"]),base:String(r["Basis (Planung)"]==null?"":r["Basis (Planung)"]),editedAt:Date.now()});});
+  sheetObjs(wb,"Wochen-Check").forEach(r=>{const d=toISODate(r["Woche (Montag)"]);if(!d)return;let k=String(r["Bereich-Key"]||"").trim();
+    if(!k){const hit=WEEK_CATS.find(c=>c.label.toLowerCase()===String(r["Bereich"]||"").trim().toLowerCase());k=hit?hit.key:"";}if(!k)return;
+    const cat=WEEK_CATS.find(c=>c.key===k);const st=String(r["Status"]||"").trim();N.weekChecks.push({wk:weekKey(d),cat:k,note:cat&&st===cat.none?"":st});});
+  return {state:N,issues};}
+const countsOf=st=>`${st.sessions.length} Sessions · ${st.str.length} Kraft-Einträge · ${(st.gripTrain||[]).length} Griff-Training · ${st.measures.length} Griff-Messung · ${st.jumps.length} Sprung · ${st.weight.length} Gewicht`;
+
+/* Plan → Ziele (unverändert aus v1) */
+function parsePlanWb(wb,fileName){
+  const rows=[],colors={};const aoa=n=>wb.Sheets[n]?XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:""}):null;
+  const findHdr=(A,key)=>{for(let i=0;i<A.length;i++)if(A[i]&&A[i].some(c=>String(c).trim()===key))return i;return -1;};
+  const col=(H,n)=>H.map(x=>String(x).trim()).indexOf(n);
+  const ph=aoa("Phasen");if(ph){const h=findHdr(ph,"Name");if(h>=0)for(let i=h+1;i<ph.length;i++){const n=String(ph[i][0]||"").trim();let c=String(ph[i][1]||"").trim();if(n&&c){if(c[0]!=="#")c="#"+c;colors[n]=c;}}}
+  const push=(wk,area,dim,phase,note)=>{wk=toISODate(wk);if(!wk)return;wk=weekKey(wk);phase=String(phase||"").trim();note=String(note||"").trim();if(phase||note)rows.push({wk,area,dim,phase,note});};
+  const Z=aoa("Ziele");
+  if(Z){const h=findHdr(Z,"Woche (Montag)");if(h>=0){const H=Z[h],wi=col(H,"Woche (Montag)"),ki=col(H,"Bereich-Key"),bi=col(H,"Bereich"),di=col(H,"Dimension"),pi=col(H,"Plan-Phase"),ni=col(H,"Notiz");
+    for(let i=h+1;i<Z.length;i++){const r=Z[i];let key=ki>=0?String(r[ki]).trim():"";if(!key){const lb=String(r[bi]||"").trim();const hit=PLAN_AREAS.find(a=>a[1]===lb);key=hit?hit[0]:lb.toLowerCase();}
+      const dl=String(r[di]||"").toLowerCase();push(r[wi],key,dl.startsWith("vol")?"vol":dl.startsWith("int")?"int":dl.startsWith("makro")?"makro":"all",r[pi],ni>=0?r[ni]:"");}}}
+  else{
+    const G=aoa("Gesamt");if(G){const h=findHdr(G,"Woche (Montag)");if(h>=0){const H=G[h],wi=col(H,"Woche (Montag)"),pi=col(H,"Plan-Phase"),ni=col(H,"Notiz");for(let i=h+1;i<G.length;i++)push(G[i][wi],"gesamt","all",G[i][pi],ni>=0?G[i][ni]:"");}}
+    [["Klettern","klettern"],["Velo","velo"],["Kickbox","kickbox"]].forEach(([sn,key])=>{const A=aoa(sn);if(!A)return;const h=findHdr(A,"Woche (Montag)");if(h<0)return;const H=A[h];
+      const wi=col(H,"Woche (Montag)"),vp=col(H,"Vol Plan-Phase"),ip=col(H,"Int Plan-Phase"),vn=col(H,"Vol Notiz"),inn=col(H,"Int Notiz");
+      for(let i=h+1;i<A.length;i++){push(A[i][wi],key,"vol",A[i][vp],vn>=0?A[i][vn]:"");push(A[i][wi],key,"int",A[i][ip],inn>=0?A[i][inn]:"");}});
+    const K=aoa("Kraft");if(K){const h=findHdr(K,"Woche (Montag)");if(h>=0){const H=K[h],ci=col(H,"Kategorie"),wi=col(H,"Woche (Montag)"),vp=col(H,"Vol Plan-Phase"),ip=col(H,"Int Plan-Phase"),vn=col(H,"Vol Notiz"),inn=col(H,"Int Notiz");
+      for(let i=h+1;i<K.length;i++){const c=catKey(K[i][ci]);if(c==="other")continue;push(K[i][wi],"kraft_"+c,"vol",K[i][vp],vn>=0?K[i][vn]:"");push(K[i][wi],"kraft_"+c,"int",K[i][ip],inn>=0?K[i][inn]:"");}}}}
+  const balScale=[];const sk=aoa("Skala");if(sk){const h=findHdr(sk,"Bezeichnung");if(h>=0){const bi=col(sk[h],"Bezeichnung");for(let i=h+1;i<sk.length;i++){const l=String(sk[i][bi]||"").trim();if(l)balScale.push(l);}}}
+  if(!rows.length&&!Object.keys(colors).length)throw new Error("Keine Plan-Daten gefunden. Erwartet wird die Mappe der Planungs-App (signalpult-mappe.xlsx).");
+  return {rows,colors,balScale,file:fileName,loadedAt:Date.now()};}
+
+/* Sprungsensor (Blatt „All“) — Aggregation wie im Training Monitor */
+function parseJumpWb(wb,fn){
+  const name=wb.Sheets["All"]?"All":wb.SheetNames[0];const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:""});
+  if(!rows||rows.length<2)throw new Error("Keine Datenzeilen in "+fn);
+  const H=rows[0].map(c=>String(c).trim().toLowerCase());const idx=ps=>{for(let i=0;i<H.length;i++)for(const p of ps)if(H[i].includes(p))return i;return -1;};
+  const iName=idx(["name"]),iDrill=idx(["drill"]),iWt=idx(["weight"]),iH=idx(["jump height","sprunghöhe"]),iMean=idx(["mean power"]),iPeak=idx(["peak power"]),iSquat=idx(["squat"]),iTTPV=idx(["time to peak","ttpv"]),iRSI=idx(["rsi"]);
+  if(iH<0&&iRSI<0)throw new Error(fn+": weder Sprunghöhe noch RSI erkannt.");
+  const isMM=iH>=0&&/mm/.test(H[iH]);const sessions=[];let cur=null;
+  for(let r=1;r<rows.length;r++){const row=rows[r];const ts=row[0];
+    if(ts!==""&&ts!=null){if(cur)sessions.push(cur);const nm=iName>=0?String(row[iName]||"").toLowerCase():"";const wr=iWt>=0?String(row[iWt]||"").trim():"";
+      cur={ts,leg:/left|links/.test(nm)?"left":/right|rechts/.test(nm)?"right":"both",drill:iDrill>=0?String(row[iDrill]||"").trim():"",weight_kg:wr?(num(wr.replace(/[^\d.,-]/g,""))):null,reps:[]};}
+    if(!cur)continue;const g=i=>{if(i<0)return null;const v=num(row[i]);return v!=null&&v>0?v:null;};const rep={h:g(iH),mean:g(iMean),peak:g(iPeak),squat:g(iSquat),ttpv:g(iTTPV),rsi:g(iRSI)};
+    if(rep.h!=null||rep.rsi!=null)cur.reps.push(rep);}
+  if(cur)sessions.push(cur);
+  const out=[];sessions.forEach(s=>{if(!s.reps.length)return;const {date,time}=splitTs(s.ts);if(!date)return;
+    const arr=k=>s.reps.map(r=>r[k]).filter(v=>v!=null),mx=a=>a.length?Math.max(...a):null,mn=a=>a.length?Math.min(...a):null;const cm=v=>v==null?null:+((isMM?v/10:v)).toFixed(1);
+    const h=arr("h"),rs=arr("rsi");
+    out.push({id:uid("j"),date,time,leg:s.leg,drill:s.drill,weight_kg:s.weight_kg,reps:s.reps.length,best:cm(mx(h)),mean:cm(avg(h)),
+      rsi:mx(rs)!=null?+mx(rs).toFixed(2):null,rsi_mean:avg(rs)!=null?+avg(rs).toFixed(2):null,mean_power_w:avg(arr("mean"))!=null?Math.round(avg(arr("mean"))):null,
+      peak_power_w:mx(arr("peak"))!=null?Math.round(mx(arr("peak"))):null,ttpv_ms:mn(arr("ttpv")),ttpv_mean_ms:avg(arr("ttpv"))!=null?Math.round(avg(arr("ttpv"))):null,
+      squat_mm:avg(arr("squat"))!=null?Math.round(avg(arr("squat"))):null,source:fn});});
+  return out;}
+function splitTs(v){if(v instanceof Date){const d=new Date(v.getTime()-v.getTimezoneOffset()*6e4).toISOString();return {date:d.slice(0,10),time:d.slice(11,16)};}
+  if(typeof v==="number"){const d=new Date(Math.round((v-25569)*864e5)).toISOString();return {date:d.slice(0,10),time:d.slice(11,16)};}
+  const s=String(v).trim();const t=s.match(/(\d{1,2}):(\d{2})/);return {date:toISODate(s),time:t?t[1].padStart(2,"0")+":"+t[2]:""};}
+function mergeJump(recs){let added=0,dup=0;recs.forEach(r=>{const k=r.date+"|"+r.time+"|"+r.leg;const i=S.jumps.findIndex(j=>j.date+"|"+j.time+"|"+j.leg===k);if(i>=0){r.id=S.jumps[i].id;S.jumps[i]=r;dup++;}else{S.jumps.push(r);added++;}});return {added,dup};}
+
+/* =====================================================================
+   DATEIEN — Drive-Ordner (Desktop), Teilen (App), Download
+   ===================================================================== */
+/* Ordnerzugriff nur am Computer: Android-WebViews melden showDirectoryPicker, öffnen aber keinen Dialog. */
+function folderPickerOK(){ const C=window.Capacitor; if(C&&C.isNativePlatform&&C.isNativePlatform()) return false; if(/Android|iPhone|iPad/i.test(navigator.userAgent)) return false; return "showDirectoryPicker" in window; }
+const fsSupported=folderPickerOK();let dirHandle=null;
+function idb(mode,fn){return new Promise((res,rej)=>{const o=indexedDB.open("tracking-fs",1);o.onupgradeneeded=()=>o.result.createObjectStore("kv");o.onsuccess=()=>{const db=o.result,tx=db.transaction("kv",mode),r=fn(tx.objectStore("kv"));tx.oncomplete=()=>{db.close();res(r&&r.result);};tx.onerror=()=>{db.close();rej(tx.error);};};o.onerror=()=>rej(o.error);});}
+async function fsVerify(write){if(!dirHandle)return false;const opt={mode:write?"readwrite":"read"};if((await dirHandle.queryPermission(opt))==="granted")return true;return (await dirHandle.requestPermission(opt))==="granted";}
+async function fsConnect(){try{dirHandle=await window.showDirectoryPicker({mode:"readwrite"});await idb("readwrite",st=>st.put(dirHandle,"dir"));toast("Ordner verbunden: "+dirHandle.name);await fsLoadAll();}catch(e){if(e&&e.name!=="AbortError")toast("Ordner nicht verbunden: "+(e.message||e.name));}render();}
+/* Sprungsensor als JSON: Tabelle (Liste von Zeilen) irgendwo in der Datei, mit oder ohne Kopfzeile.
+   Spaltenreihenfolge ohne Kopfzeile wie im Sensor-Export. */
+const JUMP_HEADER=["Timestamp","Name","Time","Drill","weight","Set","Reps","Jump Height(mm)","Mean power(W)","Peak power(W)","Squat distance(mm)","Time to peak velocity(ms)","RSI"];
+function jumpTableIn(j){let best=null;
+  if(j&&j.sprung&&Array.isArray(j.sprung.rows)&&j.sprung.rows.length){const r=j.sprung.rows;return {rows:r,hasHdr:!!(r[0]&&r[0].some(c=>/jump height|timestamp/i.test(String(c))))};} // Trainingsdatei (Apps Script)
+  (function walk(x,d){if(d>6||x==null||best)return;
+    if(Array.isArray(x)&&x.length&&x.every(r=>Array.isArray(r))){const hasHdr=x[0].some(c=>/jump height|timestamp/i.test(String(c)));const wide=x.filter(r=>r.length>=8).length;
+      if(hasHdr||wide>=Math.max(1,x.length*0.6)){best={rows:x,hasHdr};return;}}
+    if(Array.isArray(x)){x.forEach(v=>walk(v,d+1));return;}
+    if(typeof x==="object"){const ks=Object.keys(x);const pri=ks.filter(k=>/^all$|values|rows|data/i.test(k));pri.concat(ks.filter(k=>!pri.includes(k))).forEach(k=>walk(x[k],d+1));}})(j,0);
+  return best;}
+function isJumpJson(j){return !!jumpTableIn(j);}
+function jumpJsonToWb(j){const t=jumpTableIn(j);if(!t)throw new Error("In der JSON ist keine Sprung-Tabelle.");
+  const rows=t.hasHdr?t.rows:[JUMP_HEADER].concat(t.rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),"All");return wb;}
+async function readFileWb(file){if(/\.json$/i.test(file.name)){const j=JSON.parse(await file.text());if(isJumpJson(j))return jumpJsonToWb(j);throw new Error(file.name+": keine Sprung-Tabelle gefunden");}const buf=await file.arrayBuffer();if(/\.(csv|txt)$/i.test(file.name))return XLSX.read(new TextDecoder().decode(buf),{type:"string",cellDates:true});return XLSX.read(new Uint8Array(buf),{type:"array",cellDates:true});}
+async function fsLoadAll(){
+  if(!dirHandle||!(await fsVerify(false))){toast("Kein Zugriff auf den Ordner");return;}const done=[];
+  try{const f=await (await dirHandle.getFileHandle(FILE_TRACKING)).getFile();
+    if(!S.meta.dirty||confirm("In der App gibt es ungespeicherte Änderungen. Trotzdem tracking.xlsx laden und diese verwerfen?")){const {state,issues}=parseTrackingWb(await readFileWb(f));applyLoaded(state,f.lastModified);done.push("Tracking");if(issues.length)showIssues(issues);}
+  }catch(e){if(e.name!=="NotFoundError")toast("tracking.xlsx: "+e.message);}
+  try{const f=await (await dirHandle.getFileHandle(FILE_PLAN)).getFile();GOALS=parsePlanWb(await readFileWb(f),FILE_PLAN);lsSet(LS_GOALS,GOALS);const sy=reconcileNotes();done.push("Plan"+(sy?" ("+sy+" Notiz(en) synchron)":""));}catch(e){if(e.name!=="NotFoundError")toast("Plan: "+e.message);}
+  let jAdd=0;for await(const [name,h] of dirHandle.entries()){if(h.kind!=="file")continue;const lo=name.toLowerCase();
+    if(!/\.(xlsx|csv|json)$/.test(lo)||[FILE_TRACKING,FILE_PLAN,FILE_MOBILITY].includes(lo)||/signalpult|polar|training-daten|tracking/.test(lo))continue;
+    try{let wb;try{wb=await readFileWb(await h.getFile());}catch(_){continue;}if(!wb.Sheets["All"])continue;jAdd+=mergeJump(parseJumpWb(wb,name)).added;}catch(e){}}
+  if(jAdd){done.push(jAdd+" neue Sprung-Sessions");persist();}
+  toast(done.length?"Geladen: "+done.join(", "):"Im Ordner nichts Passendes gefunden");render();}
+async function fsSave(force){
+  if(!dirHandle||!(await fsVerify(true))){toast("Kein Schreibzugriff auf den Ordner");return false;}
+  try{let fh;try{fh=await dirHandle.getFileHandle(FILE_TRACKING);const f=await fh.getFile();if(!force&&S.meta.fileStamp&&f.lastModified>S.meta.fileStamp+2000){conflictModal();return false;}}
+    catch(e){fh=await dirHandle.getFileHandle(FILE_TRACKING,{create:true});}
+    const w=await fh.createWritable();await w.write(new Blob([workbookBytes()]));await w.close();
+    S.meta.fileStamp=(await fh.getFile()).lastModified;S.meta.dirty=false;S.meta.lastSaved=Date.now();persist(false);toast("In Ordner gespeichert: "+FILE_TRACKING);return true;
+  }catch(e){toast("Speichern fehlgeschlagen: "+(e.message||e.name));return false;}}
+let autoT=null;function scheduleAutoSave(){if(!UI.autoSave||!dirHandle)return;clearTimeout(autoT);autoT=setTimeout(()=>fsSave(false),1500);}
+const capOK=()=>!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform()&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Filesystem&&window.Capacitor.Plugins.Share);
+function b64(bytes){let s="";const a=new Uint8Array(bytes);for(let i=0;i<a.length;i+=0x8000)s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000));return btoa(s);}
+/* ---- Handy-Speicher (Capacitor-APK): Dokumente/Training/<Datei> -------------
+   Jede App schreibt ihre eigene Datei. Klappt das nicht (z. B. weil Excel die Datei
+   neu angelegt hat und sie der App nicht mehr „gehört“), öffnet sich der Teilen-Dialog. */
+const PHONE_DIR = "Training";
+function phoneNative(){ const C=window.Capacitor; return !!(C&&C.isNativePlatform&&C.isNativePlatform()&&C.Plugins&&C.Plugins.Filesystem); }
+function phoneB64(content){ const a = typeof content==="string" ? new TextEncoder().encode(content) : new Uint8Array(content.buffer?content.buffer:content); let s=""; for(let i=0;i<a.length;i+=0x8000) s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000)); return btoa(s); }
+async function saveToPhone(content, fileName){
+  if(!phoneNative()) return false;
+  const FS=window.Capacitor.Plugins.Filesystem, SH=window.Capacitor.Plugins.Share, data=phoneB64(content);
+  try{ if(FS.requestPermissions) await FS.requestPermissions(); }catch(e){}
+  try{ await FS.writeFile({path:PHONE_DIR+"/"+fileName, data, directory:"DOCUMENTS", recursive:true});
+       phoneMsg("Gespeichert: Dokumente/"+PHONE_DIR+"/"+fileName); return true; }
+  catch(e){
+    try{ await FS.writeFile({path:fileName, data, directory:"CACHE"}); const u=await FS.getUri({path:fileName, directory:"CACHE"});
+         if(SH){ await SH.share({title:fileName, url:u.uri, dialogTitle:fileName+" speichern"}); phoneMsg("Direktes Speichern ging nicht — bitte im Teilen-Dialog ablegen"); return true; } }
+    catch(e2){ if(/cancel/i.test(String(e2&&e2.message))) return true; }
+    phoneMsg("Speichern fehlgeschlagen: "+(e&&e.message||e)); return true;
+  }
+}
+function phoneMsg(m){ try{ if(typeof toast==="function"){ toast(m); return; } }catch(e){} try{ const el=document.getElementById("folderStatus"); if(el){ el.textContent=m; return; } }catch(e){} alert(m); }
+
+async function exportFile(){
+  const bytes=workbookBytes();const mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  if(await saveToPhone(bytes,FILE_TRACKING)){markExported();return;}
+  try{if(capOK()){const {Filesystem,Share}=window.Capacitor.Plugins;await Filesystem.writeFile({path:FILE_TRACKING,data:b64(bytes),directory:"CACHE"});const u=await Filesystem.getUri({path:FILE_TRACKING,directory:"CACHE"});await Share.share({title:FILE_TRACKING,url:u.uri,dialogTitle:"tracking.xlsx im Drive-Ordner ablegen"});markExported();return;}
+    const file=new File([bytes],FILE_TRACKING,{type:mime});if(navigator.canShare&&navigator.canShare({files:[file]})&&/Android|iPhone|iPad/i.test(navigator.userAgent)){await navigator.share({files:[file],title:FILE_TRACKING});markExported();return;}
+  }catch(e){if(e&&/abort|cancel/i.test(e.name+e.message))return;}
+  const url=URL.createObjectURL(new Blob([bytes],{type:mime}));const a=document.createElement("a");a.href=url;a.download=FILE_TRACKING;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);markExported();}
+function markExported(){S.meta.dirty=false;S.meta.lastSaved=Date.now();persist(false);if(!phoneNative())toast("tracking.xlsx exportiert");}
+function applyLoaded(state,stamp){state.meta={dirty:false,lastSaved:S.meta.lastSaved,fileStamp:stamp||null};S=normState(state);persist(false);}
+async function importTrackingFile(file){
+  try{const {state,issues}=parseTrackingWb(await readFileWb(file));
+    openModal(`<h3>Excel laden?</h3><p class="hint">Aus <b>${esc(file.name)}</b>:<br>${esc(countsOf(state))}</p><p class="hint">Aktuell in der App:<br>${esc(countsOf(S))}</p>
+      <p class="hint">Die Datei ersetzt den App-Stand vollständig — so bleiben deine Excel-Änderungen erhalten.${S.meta.dirty?' <b class="warn">Ungespeicherte App-Änderungen gehen verloren.</b>':""}</p>
+      <div class="acts"><button class="btn ghost" data-act="closeModal">Abbrechen</button><button class="btn primary" id="confirmLoad">Excel laden</button></div>`);
+    $("#confirmLoad").onclick=()=>{applyLoaded(state,null);closeModal();if(issues.length)showIssues(issues);else toast("Excel geladen");render();};
+  }catch(e){toast(e.message);}}
+async function importPlanFile(file){try{GOALS=parsePlanWb(await readFileWb(file),file.name);lsSet(LS_GOALS,GOALS);const sy=reconcileNotes();toast(`Plan geladen: ${GOALS.rows.length} Einträge`+(sy?` · ${sy} Notiz(en) jetzt synchron`:""));render();}catch(e){toast(e.message);}}
+async function importJumpFiles(files){
+  const recs=[],errs=[];for(const f of files){try{recs.push(...parseJumpWb(await readFileWb(f),f.name));}catch(e){errs.push(e.message);}}
+  if(!recs.length){toast(errs[0]||"Keine Sprung-Sessions gefunden");return;}
+  const legs={both:0,left:0,right:0};recs.forEach(r=>legs[r.leg]++);const dups=recs.filter(r=>S.jumps.some(j=>j.date===r.date&&j.time===r.time&&j.leg===r.leg)).length;
+  openModal(`<h3>Sprung-Sessions übernehmen</h3><p class="hint">${recs.length} Sessions erkannt: ${legs.both} beidbeinig, ${legs.left} links, ${legs.right} rechts.<br>${dups} davon sind schon erfasst und werden aktualisiert.</p>
+    ${errs.length?`<p class="hint warn">${errs.map(esc).join("<br>")}</p>`:""}<div class="acts"><button class="btn ghost" data-act="closeModal">Abbrechen</button><button class="btn primary" id="confirmJump">Übernehmen</button></div>`);
+  $("#confirmJump").onclick=()=>{const r=mergeJump(recs);persist();closeModal();toast(`${r.added} neu, ${r.dup} aktualisiert`);render();};}
+function conflictModal(){
+  openModal(`<h3>Excel wurde außerhalb der App geändert</h3><p class="hint">tracking.xlsx im Ordner ist neuer als der Stand, den die App kennt — vermutlich hast du sie in Excel bearbeitet. Lade sie zuerst, sonst überschreibt die App deine Änderungen.</p>
+    <div class="acts"><button class="btn danger" id="cfOverwrite">Trotzdem überschreiben</button><button class="btn primary" id="cfLoad">Excel laden</button></div>`);
+  $("#cfLoad").onclick=async()=>{closeModal();S.meta.dirty=false;await fsLoadAll();};$("#cfOverwrite").onclick=async()=>{closeModal();await fsSave(true);};}
+function showIssues(l){openModal(`<h3>Geladen — mit Hinweisen</h3><p class="hint">Diese Zeilen wurden übersprungen:</p><div class="hint" style="max-height:40vh;overflow:auto">${l.slice(0,40).map(esc).join("<br>")}</div><div class="acts"><button class="btn primary" data-act="closeModal">OK</button></div>`);}
+
+/* =====================================================================
+   UI-GRUNDBAUSTEINE
+   ===================================================================== */
+function toast(msg,undoFn){const t=$("#toast");t.innerHTML=esc(msg)+(undoFn?'<button class="undo">Rückgängig</button>':"");t.classList.add("on");clearTimeout(toast._t);
+  if(undoFn)t.querySelector(".undo").onclick=()=>{undoFn();t.classList.remove("on");};toast._t=setTimeout(()=>t.classList.remove("on"),undoFn?6000:2600);}
+const undoToast=(m,fn)=>toast(m,fn);
+function openModal(html){$("#modalRoot").innerHTML=`<div class="modal-bg" data-act="bgClose"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;if(!html.includes("strCatList")){const f=$("#modalRoot input,#modalRoot textarea");if(f)f.focus();}}
+function closeModal(){$("#modalRoot").innerHTML="";}
+/* inputModal wie im Monitor: Felder text/number/date/buttons */
+function inputModal({title,fields,saveLabel,onSave}){
+  const val={};fields.forEach(f=>val[f.key]=f.value!=null?f.value:"");
+  const body=fields.map(f=>{
+    if(f.type==="buttons")return `<div><span class="fldlab">${esc(f.label)}</span><div class="opts" data-bgroup="${f.key}">${f.options.map(o=>`<button type="button" class="opt ${String(val[f.key])===String(o.value)?"g":""}" data-bval="${esc(o.value)}">${esc(o.label)}</button>`).join("")}</div></div>`;
+    return `<div><label class="fldlab" for="im_${f.key}">${esc(f.label)}</label><input id="im_${f.key}" type="${f.type||"text"}" ${f.type==="number"?'inputmode="decimal"':""} value="${esc(val[f.key])}" placeholder="${esc(f.placeholder||"")}"></div>`;}).join("");
+  openModal(`<h3>${esc(title)}</h3><div class="stack">${body}</div><div class="acts"><button class="btn ghost" data-act="closeModal">Abbrechen</button><button class="btn primary" id="imSave">${esc(saveLabel||"Speichern")}</button></div>`);
+  $("#modalRoot").querySelectorAll("[data-bgroup]").forEach(g=>g.addEventListener("click",e=>{const b=e.target.closest("[data-bval]");if(!b)return;val[g.dataset.bgroup]=b.dataset.bval;g.querySelectorAll(".opt").forEach(x=>x.classList.toggle("g",x===b));}));
+  $("#imSave").onclick=()=>{fields.forEach(f=>{if(f.type!=="buttons"){const el=$("#im_"+f.key);val[f.key]=el?el.value:"";}});
+    const miss=fields.find(f=>f.required&&!String(val[f.key]).trim());if(miss){toast(miss.label+" fehlt");return;}closeModal();onSave(val);};}
+let entryDateDefault=null;
+function dateField(id,value){const v=value||entryDateDefault||today();return `<div><label class="fldlab" for="${id}">Datum <i>(für Nachtragen änderbar)</i></label><input type="date" id="${id}" value="${v}" max="${today()}" data-kw><div class="kwb" id="${id}_kw">${kwLabel(v)}</div></div>`;}
+const getDate=id=>{const el=document.getElementById(id);return (el&&el.value)||today();};
+const info=k=>`<button class="btn ghost small" style="min-height:26px;padding:0 7px;margin-left:4px" data-act="info" data-k="${k}" aria-label="Info">i</button>`;
+
+/* =====================================================================
+   NAVIGATION
+   ===================================================================== */
+const ICONS={
+  woche:'<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+  sess:'<svg viewBox="0 0 24 24"><path d="M5 20l5-9 3 5 2-3 4 7z"/><circle cx="16" cy="6" r="2"/></svg>',
+  kraft:'<svg viewBox="0 0 24 24"><path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/></svg>',
+  gewicht:'<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9.5a3.5 3.5 0 0 1 6 0M12 9.5l1.4-1.6"/></svg>',
+  mehr:'<svg viewBox="0 0 24 24"><path d="M6 3.5h8l4 4V20.5H6z"/><path d="M14 3.5V8h4M9 13h6M9 16.5h6"/></svg>'};
+const TABS=[["woche","Woche"],["sess","Sessions"],["kraft","Kraft"],["gewicht","Gewicht"],["mehr","Mehr"]];
+function renderTabs(){$("#tabs").innerHTML=TABS.map(([k,l])=>`<button data-act="tab" data-v="${k}" ${UI.tab===k?'aria-current="page"':""}>${ICONS[k]}<span>${l}</span></button>`).join("");}
+function updatePill(){const p=$("#savePill"),t=$("#savePillTxt");if(!p)return;p.classList.toggle("dirty",!!S.meta.dirty);p.classList.toggle("clean",!S.meta.dirty&&!!S.meta.lastSaved);
+  t.textContent=S.meta.dirty?"Nicht gespeichert":S.meta.lastSaved?"Gespeichert "+new Date(S.meta.lastSaved).toLocaleTimeString("de-CH",{hour:"2-digit",minute:"2-digit"}):"Noch nie gespeichert";}
+function render(){renderTabs();updatePill();const v=$("#view");
+  v.innerHTML=UI.tab==="woche"?viewWoche():UI.tab==="sess"?viewSessions():UI.tab==="kraft"?viewKraft():UI.tab==="gewicht"?viewGewicht():viewMehr();
+  if(UI.tab==="kraft"&&UI.kraft==="str")renderStrExercises();}
+const subtabs=(items,cur,act)=>`<div class="subtabs" role="tablist">${items.map(([k,l])=>`<button data-act="${act}" data-v="${k}" aria-current="${cur===k}">${l}</button>`).join("")}</div>`;
+
+/* =====================================================================
+   WOCHE — Ziele aus der Planung neben dem Ist
+   ===================================================================== */
+function weekIst(wk){const end=addDays(wk,6),inW=d=>d>=wk&&d<=end;const bySport={};
+  S.sessions.filter(s=>inW(s.date)).forEach(s=>{const k=s.sport==="climb"?"klettern":s.sport==="kick"?"kickbox":"other";const b=bySport[k]||(bySport[k]={n:0,int:[],vol:[]});b.n++;if(s.intensity)b.int.push(s.intensity);if(s.volume)b.vol.push(s.volume);});
+  const kraft={};S.str.filter(w=>inW(w.date)).forEach(w=>(w.exercises||[]).forEach(ex=>{const c=ex.category||"other";const b=kraft[c]||(kraft[c]={sets:0,ton:0,rir:[],entries:new Set()});b.entries.add(w.id);
+    const m=ex.unilateral?2:1;(ex.sets||[]).forEach(st=>{b.sets++;if(st.rir!=null&&st.rir!=="")b.rir.push(+st.rir);const r=strSetReps_(ex,st);if(r==null)return;b.ton+=r*(strSetKg_(w,ex,st)||0)*m;});}));
+  return {bySport,kraft};}
+function istLine(key,ist){
+  if(key.startsWith("kraft_")){const k=ist.kraft[key.slice(6)];if(!k)return "";return `<b>${k.sets}</b> Sätze · <b>${fmt(k.ton,0)}</b> kg Tonnage${k.rir.length?` · RIR Ø <b>${fmt(avg(k.rir),1)}</b>`:""}`;}
+  const b=ist.bySport[key];if(!b)return "";return `<b>${b.n}</b> Session${b.n===1?"":"s"}${b.int.length?` · Int Ø <b>${fmt(avg(b.int),1)}</b>`:""}${b.vol.length?` · Vol Ø <b>${fmt(avg(b.vol),1)}</b>`:""}`;}
+/* ---- Wochen-Checkliste (wie die Wochenübersicht im Training Monitor):
+   erfasst → Anzahl; nichts erfasst → bewusst abhaken („nicht trainiert“), sonst offen ---- */
+const WEEK_CATS=[
+  {key:"climb",label:"Klettern",none:"nicht trainiert",unit:["Session","Sessions"],go:{tab:"sess",sess:"climb"},count:(a,b)=>S.sessions.filter(x=>x.sport==="climb"&&x.date>=a&&x.date<=b).length},
+  {key:"kick",label:"Kickbox",none:"nicht trainiert",unit:["Session","Sessions"],go:{tab:"sess",sess:"kick"},count:(a,b)=>S.sessions.filter(x=>x.sport==="kick"&&x.date>=a&&x.date<=b).length},
+  {key:"other",label:"Sonstiges",none:"nichts anderes",unit:["Session","Sessions"],go:{tab:"sess",sess:"other"},count:(a,b)=>S.sessions.filter(x=>x.sport==="other"&&x.date>=a&&x.date<=b).length},
+  {key:"str",label:"Krafttraining",none:"nicht trainiert",unit:["Session","Sessions"],go:{tab:"kraft",kraft:"str"},count:(a,b)=>{const ws=S.str.filter(w=>w.date>=a&&w.date<=b);return ws.length?Math.max(ws.length,ws.reduce((x,w)=>x+(+w.n||0),0)):0;}},
+  {key:"griptrain",label:"Griffkraft-Training",none:"nicht trainiert",unit:["Einheit","Einheiten"],go:{tab:"kraft",kraft:"griff"},count:(a,b)=>(S.gripTrain||[]).filter(g=>g.date>=a&&g.date<=b).length},
+  {key:"grip",label:"Griffkraft-Messung",none:"nicht gemessen",unit:["Messung","Messungen"],go:{tab:"kraft",kraft:"mess"},count:(a,b)=>S.measures.filter(m=>m.date>=a&&m.date<=b).length},
+  {key:"jump",label:"Sprung",none:"nicht gemessen",unit:["Session","Sessions"],go:{tab:"kraft",kraft:"mess"},count:(a,b)=>S.jumps.filter(j=>j.date>=a&&j.date<=b).length},
+  {key:"weight",label:"Gewicht",none:"nicht gewogen",unit:["Wiegung","Wiegungen"],go:{tab:"gewicht"},count:(a,b)=>S.weight.filter(w=>w.date>=a&&w.date<=b).length}];
+const weekCatsActive=()=>WEEK_CATS.filter(c=>S.settings.weekCats[c.key]!==false);
+const weekCheckOf=(wk,k)=>S.weekChecks.find(c=>c.wk===wk&&c.cat===k);
+function weekCatStatus(wk,c){const n=c.count(wk,addDays(wk,6));if(n>0)return {st:"done",n};const m=weekCheckOf(wk,c.key);return m?{st:"skip",note:m.note||c.none}:{st:"open"};}
+function weekSummary(wk){const cats=weekCatsActive();let done=0;cats.forEach(c=>{if(weekCatStatus(wk,c).st!=="open")done++;});return {done,total:cats.length,band:!cats.length||done===cats.length?"g":done>0?"y":"r"};}
+function viewWoche(){
+  const cur=weekKey(today());const wk=addDays(cur,7*UI.weekOffset);const isFuture=wk>cur;
+  const rel=UI.weekOffset===0?"Diese Woche":UI.weekOffset===-1?"Letzte Woche":UI.weekOffset>0?"in "+UI.weekOffset+" Woche"+(UI.weekOffset>1?"n":""):"vor "+(-UI.weekOffset)+" Wochen";
+  const sum=weekSummary(wk);
+  let h=`<div class="viewhead row"><div class="grow"><h2>KW ${isoWeekNo(wk)} <span style="color:var(--muted);font-weight:500;font-size:15px">${fmtRange(wk)}</span></h2><div class="sub">${rel}${isFuture?"":` · <b>${sum.done}/${sum.total}</b> erledigt`}</div></div>
+    <button class="btn small ghost" data-act="wkShift" data-v="-1" aria-label="Vorherige Woche">‹</button><button class="btn small ghost" data-act="wkShift" data-v="0" ${UI.weekOffset===0?"disabled":""}>Heute</button><button class="btn small ghost" data-act="wkShift" data-v="1" aria-label="Nächste Woche">›</button></div>`;
+  if(isFuture){h+=`<div class="card empty">Diese Woche liegt in der Zukunft — hier gibt es noch nichts abzuhaken.</div>`;}
+  else{
+    h+=`<div class="list">${weekCatsActive().map(c=>{const s=weekCatStatus(wk,c);
+      const box=s.st==="done"?`<span class="wbox done" aria-hidden="true">✓</span>`:`<button class="wbox ${s.st==="skip"?"skip":""}" data-act="wkCheck" data-k="${c.key}" role="checkbox" aria-checked="${s.st==="skip"}" aria-label="${c.label}: ${c.none}">${s.st==="skip"?"✓":""}</button>`;
+      const right=s.st==="done"?`<span class="wn">${s.n} ${s.n===1?c.unit[0]:c.unit[1]}</span>`:s.st==="skip"?`<span class="wskip">${esc(s.note)}</span>`:`<span class="wopen">offen</span>`;
+      return `<div class="li wrow">${box}<button class="wgo grow" data-act="wkGo" data-k="${c.key}"><span class="t">${c.label}</span>${right}<span class="chev" aria-hidden="true">›</span></button></div>`;}).join("")||'<div class="empty">Keine Kategorien aktiv — unter Mehr ▸ Wochenübersicht einschalten.</div>'}</div>
+      <p class="hint" style="margin:8px 2px 0">Erfasstes wird automatisch gezählt. Hast du in einer Kategorie bewusst nichts gemacht, hake sie ab (z. B. „nicht trainiert“) — dann ist die Woche vollständig. Zeile antippen zum Erfassen.</p>`;}
+  // vergangene Wochen (Vollständigkeit)
+  const past=[];for(let i=1;i<=12;i++)past.push(addDays(cur,-7*i));
+  h+=`<div class="grouplab">Vergangene Wochen</div><div class="wgrid">${past.map(w=>{const sm=weekSummary(w);const off=Math.round((new Date(w)-new Date(cur))/6048e5);
+    return `<button class="wcell b-${sm.band} ${w===wk?"cur":""}" data-act="wkJump" data-v="${off}"><b>KW ${isoWeekNo(w)}</b><span>${sm.done}/${sm.total}</span></button>`;}).join("")}</div>
+    <p class="hint" style="margin:6px 2px 0">Grün vollständig · Gelb teilweise · Rot offen</p>`;
+  h+=viewZiele(wk);
+  return h;}
+/* ---- Ziele der Woche: Phasen + alle Textblöcke der Planung, Texte hier beschreibbar ---- */
+const AREA_LABEL={gesamt:"Gesamt",balance:"Load:Recovery",ausdauer:"Ausdauer",klettern:"Klettern",velo:"Velo",kickbox:"Kickbox",kraft_hinge:"Kraft · Hinge",kraft_squat:"Kraft · Squat",kraft_push:"Kraft · Push",kraft_pull:"Kraft · Pull",kraft_grip:"Kraft · Griff"};
+const areaLabel=k=>AREA_LABEL[k]||k;const dimLabel=d=>d==="vol"?"Volumen":d==="int"?"Intensität":"Gesamt";
+function planRow(wk,area,dim){return (GOALS&&GOALS.rows?GOALS.rows.find(r=>r.wk===wk&&r.area===area&&r.dim===dim):null)||{};}
+const noteOf=(wk,area,dim)=>S.planNotes.find(n=>n.wk===wk&&n.area===area&&n.dim===dim);
+function noteText(wk,area,dim){const n=noteOf(wk,area,dim);return n?n.text:(planRow(wk,area,dim).note||"");}
+function setNote(wk,area,dim,text){const pt=planRow(wk,area,dim).note||"";const n=noteOf(wk,area,dim);
+  if(text.trim()===pt.trim()){if(n)S.planNotes=S.planNotes.filter(x=>x!==n);}
+  else if(n){n.text=text;n.editedAt=Date.now();}else S.planNotes.push({wk,area,dim,text,base:pt,editedAt:Date.now()});persist();}
+/* Nach dem Laden eines neuen Plans: Notizen, die die Planung übernommen hat, sind erledigt */
+function reconcileNotes(){let n=0;S.planNotes=S.planNotes.filter(x=>{const pt=(planRow(x.wk,x.area,x.dim).note||"").trim();const t=x.text.trim();if(pt===t||(t&&pt.indexOf(t)>=0)){n++;return false;}return true;});if(n)persist();return n;}
+function balChip(v){if(!v)return `<span class="phase none">offen</span>`;const sc=(GOALS&&GOALS.balScale)||[];const i=sc.indexOf(v);const f=sc.length>1&&i>=0?i/(sc.length-1):0.5;
+  const c=f<0.34?"#2E8B8E":f<0.67?"#B87514":"#B23A2E";return `<span class="phase" style="background:${c};color:#fff">${esc(v)}</span>`;}
+function noteBox(wk,area,dim,label){const pend=!!noteOf(wk,area,dim);const t=noteText(wk,area,dim);
+  return `<div class="nbox"><label class="fldlab" for="nt_${area}_${dim}">${label}</label><textarea id="nt_${area}_${dim}" class="note-ta" data-note="${wk}|${area}|${dim}" rows="${Math.max(2,Math.min(8,t.split("\n").length+1))}" placeholder="Notiz…">${esc(t)}</textarea>
+    <div class="npend ${pend?"":"hidden"}" id="np_${area}_${dim}">↗ geändert — geht mit tracking.xlsx an die Planung</div></div>`;}
+function mkLine(wk,key){const r=planRow(wk,key,"makro");if(!r.phase)return "";return `<div class="hint" style="margin:0">Makro-Block: <b>${esc(r.phase)}</b>${r.note?" — "+esc(r.note):""}</div>`;}
+function viewZiele(wk){
+  const cur=weekKey(today());const title=wk===cur?"Ziele dieser Woche":"Ziele KW "+isoWeekNo(wk);
+  let h=`<div class="grouplab" style="margin-top:22px">${title}</div>`;
+  if(!GOALS)h+=`<p class="hint" style="margin:0 2px 8px">Noch kein Plan geladen (Mehr ▸ Plan laden). Du kannst trotzdem schon Notizen schreiben — sie gehen an die Planung.</p>`;
+  const pend=S.planNotes.length;if(pend)h+=`<p class="hint" style="margin:0 2px 8px"><b>${pend}</b> Textänderung${pend===1?"":"en"} warte${pend===1?"t":"n"} auf die Planung: tracking.xlsx speichern, in der Planung laden, dort die Mappe speichern.</p>`;
+  const ov=planRow(wk,"gesamt","all"),bal=planRow(wk,"balance","all");
+  h+=`<div class="card overall stack"><div class="row"><span class="lab grow" style="margin:0">Gesamtphase</span>${phaseChip(ov.phase)}</div>${mkLine(wk,"gesamt")}${noteBox(wk,"gesamt","all","Gesamt-Text")}</div>`;
+  h+=`<div class="card stack" style="border-left:4px solid var(--load)"><div class="row"><span class="lab grow" style="margin:0">Load : Recovery</span>${balChip(bal.phase)}</div>${noteBox(wk,"balance","all","Load:Recovery-Text")}</div>`;
+  PLAN_AREAS.filter(a=>a[0]!=="gesamt").forEach(([key])=>{const v=planRow(wk,key,"vol"),i=planRow(wk,key,"int");
+    const has=v.phase||i.phase||noteText(wk,key,"vol")||noteText(wk,key,"int");
+    h+=`<details class="fold zarea" ${has?"open":""}><summary><span class="zt">${esc(areaLabel(key))}${planRow(wk,key,"makro").phase?`<br><span class="mkt">Makro: ${esc(planRow(wk,key,"makro").phase)}</span>`:""}</span><span class="zd"><span class="dim">Vol</span>${phaseChip(v.phase)}<span class="dim">Int</span>${phaseChip(i.phase)}</span></summary>
+      <div class="body stack">${noteBox(wk,key,"vol","Volumen")}${noteBox(wk,key,"int","Intensität")}</div></details>`;});
+  return h;}
+function textOn(hex){const h=String(hex).replace("#","");if(h.length<6)return "#fff";const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return (0.299*r+0.587*g+0.114*b)>160?"#191C18":"#fff";}
+function phaseChip(name){if(!name)return `<span class="phase none">offen</span>`;const c=(GOALS&&GOALS.colors&&GOALS.colors[name])||"#6B7168";return `<span class="phase" style="background:${esc(c)};color:${textOn(c)}">${esc(name)}</span>`;}
+
+/* =====================================================================
+   SESSIONS — Klettern / Kickbox / Sonstiges (wie Training Monitor)
+   ===================================================================== */
+let sessEditId=null,sessShowNew=false,sessEdSport=null,sessEdInt=null,sessEdVol=null,sessEdFocus=[],sessFilterTag=null;
+function sessResetForm_(){sessEditId=null;sessEdInt=null;sessEdVol=null;sessEdFocus=[];}
+function sessScaleRow_(kind){const cur=kind==="int"?sessEdInt:sessEdVol;const L=kind==="int"?SESS_INT_LABELS:SESS_VOL_LABELS;
+  return [1,2,3,4,5].map(v=>`<button type="button" aria-pressed="${cur===v}" data-act="sessScale" data-k="${kind}" data-v="${v}"><b>${v}</b><span>${L[v]}</span></button>`).join("");}
+function sessFocusChips_(sp){const all=sessAllFocusTags_(sp);let h=all.map(t=>`<button type="button" class="ftag ${sessEdFocus.includes(t)?"on":""}" data-act="sessFocus" data-t="${esc(t)}">#${esc(t)}</button>`).join("");
+  h+=`<button type="button" class="ftag add" data-act="sessFocusNew" data-sp="${sp}">+ neu</button>`;if(!all.length)h=`<span class="hint" style="align-self:center">noch keine Tags — </span>`+h;return h;}
+function sessFormQuestions_(sp,editing){if(editing&&editing.technique&&editing.technique.length)return editing.technique.map(t=>({id:t.qid,q:t.q}));return sessReflectionSet_(sp);}
+function viewSessions(){
+  const sp=UI.sess;let h=`<div class="viewhead"><h2>Sessions</h2><div class="sub">Einzelne Einheit mit Intensität, Volumen, Technik-Reflexion und Fokus.</div></div>`+subtabs(SESS_SPORTS,sp,"sessTab");
+  let editing=sessEditId?S.sessions.find(x=>x.id===sessEditId):null;if(editing&&editing.sport!==sp){editing=null;sessResetForm_();}
+  if(!editing&&sessEdSport!==sp){sessEdInt=null;sessEdVol=null;sessEdFocus=[];sessShowNew=false;}sessEdSport=sp;
+  if(!editing&&!sessShowNew){h+=`<div class="card"><h3>${sportLabel(sp)}</h3><p class="hint" style="margin:0 0 10px">Neue Einheit erfassen oder unten eine bestehende bearbeiten.</p><button class="btn primary block" data-act="sessNew">+ Neu erfassen</button></div>`;return h+sessHistory_(sp);}
+  const qs=sessFormQuestions_(sp,editing);
+  h+=`<div class="card stack"><h3>${sportLabel(sp)} — ${editing?"Session bearbeiten":"neue Session"}</h3>
+    ${dateField("f_sdate",editing?editing.date:null)}
+    <div><span class="fldlab">Intensität (1–5)</span><div class="scale" id="sessIntRow">${sessScaleRow_("int")}</div></div>
+    <div><span class="fldlab">Volumen (1–5)</span><div class="scale vol" id="sessVolRow">${sessScaleRow_("vol")}</div></div>
+    <div><span class="fldlab">Technik-Reflexion</span>${!qs.length?`<p class="hint" style="margin:2px 0 0">Noch keine Fragen definiert — unter Mehr ▸ Session-Reflexion anlegen.</p>`:
+      qs.map(q=>{const pre=editing?(((editing.technique||[]).find(t=>t.qid===q.id)||{}).a||""):"";return `<div style="margin-top:8px"><label class="hint" for="sessTech_${q.id}" style="display:block;margin-bottom:3px">${esc(q.q)}</label><textarea id="sessTech_${q.id}" rows="2">${esc(pre)}</textarea></div>`;}).join("")}</div>
+    <div><span class="fldlab">${sessTagLabel_(sp)}</span><div class="chips" id="sessFocusChips">${sessFocusChips_(sp)}</div>
+      <input id="sessFocusNote" type="text" style="margin-top:8px" placeholder="${sp==="other"?"Freitext zur Sportart (optional)":"Freitext zum Fokus (optional)"}" value="${esc(editing?editing.focusNote||"":"")}"></div>
+    <div class="row"><button class="btn ghost" data-act="${editing?"sessCancel":"sessClose"}">Abbrechen</button><button class="btn primary grow" data-act="sessSave">${editing?"Änderungen speichern":"Session speichern"}</button></div></div>`;
+  return h+sessHistory_(sp);}
+function sessHistory_(sp){
+  let list=sessionsForSport_(sp);const tags=sessAllFocusTags_(sp);let h=`<div class="grouplab">Verlauf</div>`;
+  if(tags.length)h+=`<div class="chips" style="margin-bottom:8px"><button class="ftag ${sessFilterTag==null?"on":""}" data-act="sessFilter" data-t="">alle</button>${tags.map(t=>`<button class="ftag ${sessFilterTag===t?"on":""}" data-act="sessFilter" data-t="${esc(t)}">#${esc(t)}</button>`).join("")}</div>`;
+  if(sessFilterTag)list=list.filter(x=>(x.focusTags||[]).includes(sessFilterTag));
+  if(!list.length)return h+`<div class="list"><div class="empty">Noch keine Sessions${sessFilterTag?" mit #"+esc(sessFilterTag):""}.</div></div>`;
+  return h+`<div class="list">${list.map(x=>{const tp=(x.technique||[]).filter(t=>t.a).map(t=>t.a).join(" · ");const meta=[(x.focusTags||[]).map(t=>"#"+t).join(" "),x.focusNote||""].filter(Boolean).join(" · ");
+    return `<div class="li" style="align-items:flex-start"><div class="grow"><div class="t">${fmtDate(x.date)} · Int ${x.intensity??"–"} · Vol ${x.volume??"–"}</div>${meta?`<div class="s">${esc(meta)}</div>`:""}${tp?`<div class="s" style="opacity:.85">${esc(tp.slice(0,140))}${tp.length>140?"…":""}</div>`:""}</div>
+      <button class="btn ghost small" data-act="sessEdit" data-id="${x.id}" aria-label="Bearbeiten">✎</button><button class="x" data-act="sessDel" data-id="${x.id}" aria-label="Löschen">×</button></div>`;}).join("")}</div>`;}
+function sessSave(){
+  const sp=UI.sess;let editing=sessEditId?S.sessions.find(x=>x.id===sessEditId):null;if(editing&&editing.sport!==sp)editing=null;
+  const technique=sessFormQuestions_(sp,editing).map(q=>{const el=document.getElementById("sessTech_"+q.id);return {qid:q.id,q:q.q,a:el?el.value.trim():""};});
+  const rec={id:editing?editing.id:uid("ss"),date:getDate("f_sdate"),sport:sp,intensity:sessEdInt,volume:sessEdVol,technique,focusTags:sessEdFocus.slice(),focusNote:($("#sessFocusNote").value||"").trim()};
+  if(editing){const i=S.sessions.findIndex(x=>x.id===editing.id);S.sessions[i]=rec;}else S.sessions.unshift(rec);
+  sortDesc(S.sessions);sessResetForm_();sessShowNew=false;persist();render();toast("Session gespeichert");}
+
+/* =====================================================================
+   KRAFTTRAINING — Wocheneintrag mit Katalog (wie Training Monitor)
+   ===================================================================== */
+const blankEx=()=>({exerciseId:null,name:"",category:"other",unilateral:false,loadType:"weighted",bwCoeff:null,sets:[{reps:"",kg:""}]});
+let draftStr=[blankEx()],draftStrLocation=null,strEditId=null;
+function strBlankSet_(lt){if(lt==="hold")return {sec:"",addedKg:"",rir:null};if(lt==="bodyweight")return {reps:"",addedKg:"",rir:null};return {reps:"",kg:"",rir:null};}
+/* ===== GRIFFKRAFT-TRAINING (manuell + Sensor/GripForge) =====
+   TUT = Sätze × Wdh × Sek/Wdh · Volumen = Ø Last × TUT (kg·s). Sensor-Werte haben Vorrang, wenn vorhanden. */
+const GT_PROGRAMS=["Max Hangs","Repeaters","Pinch","Block / Lifting","Wrist Roller","Minimum Edge"];
+/* kind: "train" | "test" · Training: lat "bi" | "uni" (unilateral = jede Seite → TUT ×2) · Test: hand both|left|right */
+const gtKind=g=>g.kind==="test"?"test":"train";
+const gtLat=g=>g.lat||(g.hand==="left"||g.hand==="right"?"uni":"bi");
+function gtSideLabel(g){return gtKind(g)==="test"?(g.hand==="left"?"links":g.hand==="right"?"rechts":"beide"):(gtLat(g)==="uni"?"unilateral":"bilateral");}
+function gtCalc(g){const f=gtKind(g)==="train"&&gtLat(g)==="uni"?2:1;const tut=g.tut!=null?g.tut:(g.sets&&g.reps&&g.sec?g.sets*g.reps*g.sec*f:null);const vol=g.vol!=null?g.vol:(tut!=null&&g.load!=null?tut*g.load:null);return {tut,vol};}
+function gripSensorSessions(j){const arr=Array.isArray(j)?j:(j&&j.grip&&Array.isArray(j.grip.sessions))?j.grip.sessions:(j&&Array.isArray(j.sessions))?j.sessions:null;if(!arr)return [];
+  return arr.map(x=>{const st=String(x.date||x.start||x.timestamp||"");const d=new Date(st);const ok=!isNaN(d);
+    const date=ok?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`:toISODate(st);const time=ok?`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`:"";
+    const h=String(x.hand||x.side||"").toLowerCase();
+    return {id:uid("gt"),date,time,source:"sensor",program:String(x.program||x.protocol||"Sensor"),hand:/^l/.test(h)?"left":/^r/.test(h)?"right":"both",sets:num(x.sets),reps:num(x.reps),sec:num(x.rep_s||x.work_s),
+      load:num(x.mean_load_kg),peak:num(x.peak_kg),tut:num(x.total_tut_s),vol:num(x.volume_kg_s),mvc:num(x.intensity_pct_mvc),band:num(x.avg_in_band_pct),note:"",sensorId:String(x.session_id||x.id||"")};}).filter(g=>g.date);}
+function mergeGrip(list){let added=0,upd=0;S.gripTrain=S.gripTrain||[];list.forEach(g=>{const i=g.sensorId?S.gripTrain.findIndex(x=>x.sensorId===g.sensorId):-1;
+  if(i>=0){g.id=S.gripTrain[i].id;g.note=S.gripTrain[i].note||"";S.gripTrain[i]=g;upd++;}else{S.gripTrain.push(g);added++;}});return {added,upd};}
+function gripSensorFromWb(wb){ // CSV/Excel der Sensor-App (Spalten wie session_id, date, program, reps, peak_kg …)
+  const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:"",raw:true});return gripSensorSessions(rows);}
+let gtDraft=null,gtEditId=null;
+function gtBlank(kind){kind=kind||UI.gtKind||"train";const last=(S.gripTrain||[]).filter(g=>g.source!=="sensor"&&gtKind(g)===kind).sort((a,b)=>a.date<b.date?1:-1)[0]||{};
+  return kind==="test"?{kind,date:today(),program:last.program||"Max-Kraft-Test",hand:last.hand||"both",lat:"bi",sets:last.sets||1,reps:last.reps||3,sec:last.sec||5,restRep:last.restRep??60,restSet:last.restSet??0,load:null,peak:null,note:""}
+    :{kind,date:today(),program:last.program||"Max Hangs",hand:"both",lat:gtLat(last.lat?last:{lat:"bi"}),sets:last.sets||5,reps:last.reps||1,sec:last.sec||10,restRep:last.restRep??3,restSet:last.restSet??180,load:last.load??null,peak:null,note:""};}
+function viewGriffTraining(){
+  const ed=gtEditId?(S.gripTrain||[]).find(g=>g.id===gtEditId):null;if(!gtDraft)gtDraft=ed?Object.assign({},ed):gtBlank();const d=gtDraft;const c=gtCalc(d);
+  let h=`${gtPresetBar(ed)}<div class="card stack" ${ed?'style="border-color:var(--recovery)"':""}><h3>Griffkraft — ${ed?"bearbeiten":gtKind(d)==="test"?"neuer Test":"neue Trainingseinheit"}</h3>
+    ${ed?"":`<div class="seg">${[["train","Training"],["test","Test"]].map(([k,l])=>`<button data-act="gtKind" data-v="${k}" aria-pressed="${gtKind(d)===k}">${l}</button>`).join("")}</div>`}
+    <p class="hint" style="margin:0">Dein Training am Hangboard, Block oder Kraftmesser — nicht die Recovery-Messung. Sensor-Einheiten (GripForge) kommen automatisch aus der verbundenen Trainingsdatei.</p>
+    ${dateField("gt_date",d.date)}
+    <div><label class="fldlab" for="gt_prog">Programm</label><input id="gt_prog" type="text" list="gtProgList" value="${esc(d.program||"")}"><datalist id="gtProgList">${GT_PROGRAMS.map(p=>`<option value="${esc(p)}">`).join("")}</datalist></div>
+    ${gtKind(d)==="test"
+      ?`<div><span class="fldlab">Hand</span><div class="opts">${[["both","beide"],["left","links"],["right","rechts"]].map(([k,l])=>`<button type="button" class="opt ${d.hand===k?"g":""}" data-act="gtHand" data-v="${k}">${l}</button>`).join("")}</div></div>`
+      :`<div><span class="fldlab">Ausführung</span><div class="opts">${[["bi","bilateral"],["uni","unilateral"]].map(([k,l])=>`<button type="button" class="opt ${gtLat(d)===k?"g":""}" data-act="gtLat" data-v="${k}">${l}</button>`).join("")}</div>${gtLat(d)==="uni"?`<p class="hint" style="margin:4px 0 0">Jede Seite einzeln — der Timer führt links und rechts nacheinander, TUT und Volumen zählen beide Seiten.</p>`:""}</div>`}
+    <div class="grid3"><div><label class="fldlab" for="gt_sets">Sätze</label><input id="gt_sets" type="number" inputmode="numeric" value="${d.sets??""}" data-gt="sets"></div>
+      <div><label class="fldlab" for="gt_reps">Wdh / Satz</label><input id="gt_reps" type="number" inputmode="numeric" value="${d.reps??""}" data-gt="reps"></div>
+      <div><label class="fldlab" for="gt_sec">Sek / Wdh</label><input id="gt_sec" type="number" inputmode="numeric" value="${d.sec??""}" data-gt="sec"></div></div>
+    <div class="grid2"><div><label class="fldlab" for="gt_rr">Pause zw. Wdh (s)</label><input id="gt_rr" type="number" inputmode="numeric" value="${d.restRep??""}" data-gt="restRep"></div>
+      <div><label class="fldlab" for="gt_rs">Satzpause (s)</label><input id="gt_rs" type="number" inputmode="numeric" value="${d.restSet??""}" data-gt="restSet"></div></div>
+    <button class="btn block gttimerbtn" data-act="gtTimer">▶ Timer starten <span>${gtTimerSummary(d)}</span></button>
+    <div class="grid2"><div><label class="fldlab" for="gt_load">${gtKind(d)==="test"?"Ø Last (kg) <i>optional</i>":"Ø Last (kg) <i>Zug am Griff</i>"}</label><input id="gt_load" type="number" inputmode="decimal" step="0.5" value="${d.load??""}" data-gt="load"></div>
+      <div><label class="fldlab" for="gt_peak">${gtKind(d)==="test"?"Peak / Max (kg)":"Peak (kg) <i>optional</i>"}</label><input id="gt_peak" type="number" inputmode="decimal" step="0.5" value="${d.peak??""}" data-gt="peak"></div></div>
+    <div class="meta" id="gt_calc">TUT <b>${c.tut!=null?Math.round(c.tut)+" s":"–"}</b> · Volumen <b>${c.vol!=null?Math.round(c.vol).toLocaleString("de-CH")+" kg·s":"–"}</b></div>
+    <div><label class="fldlab" for="gt_note">Notiz</label><input id="gt_note" type="text" value="${esc(d.note||"")}" placeholder="z. B. 20 mm, halbe Krimp"></div>
+    <div class="row">${ed?`<button class="btn ghost" data-act="gtCancel">Abbrechen</button>`:""}<button class="btn primary grow" data-act="gtSave">${ed?"Änderungen speichern":"Einheit speichern"}</button></div>
+    ${ed?"":`<button class="btn ghost block" data-act="gtPresetNew">Als Preset speichern</button>`}
+    ${!ed&&d._preset?(()=>{const l=gtLastFor(d.program);return l?`<p class="hint" style="margin:0">Letztes Mal „${esc(d.program)}“: ${fmtDate(l.date)} · Ø ${fmt(l.load,1)} kg${l.peak!=null?" · Peak "+fmt(l.peak,1)+" kg":""}</p>`:"";})():""}</div>`;
+  h+=`<div class="card stack"><div class="row"><div class="grow"><b>Sensor (GripForge)</b><div class="hint">${(S.gripTrain||[]).filter(g=>g.source==="sensor").length} Einheiten übernommen · automatisch aus der verbundenen Trainingsdatei (Block „grip“)</div></div></div>
+    <button class="btn small" data-act="pickGripSensor">Sensor-Datei einmalig importieren (CSV/JSON)</button></div>`;
+  // Wochenübersicht
+  const byW={};(S.gripTrain||[]).forEach(g=>{const k=weekKey(g.date);const o=byW[k]||(byW[k]={n:0,vol:0,tut:0,peak:null});const c=gtCalc(g);o.n++;o.vol+=c.vol||0;o.tut+=c.tut||0;if(g.peak!=null)o.peak=Math.max(o.peak||0,g.peak);});
+  const wks=Object.keys(byW).sort().reverse().slice(0,8);
+  if(wks.length)h+=`<div class="grouplab">Wochen</div><div class="card tblwrap" style="padding:4px 8px"><table class="log"><tr><th>Woche</th><th>Einh.</th><th>TUT</th><th>Volumen</th><th>Peak</th></tr>${wks.map(k=>{const o=byW[k];return `<tr><td class="v">KW ${isoWeekNo(k)}</td><td class="v">${o.n}</td><td class="v">${Math.round(o.tut)} s</td><td class="v">${Math.round(o.vol).toLocaleString("de-CH")}</td><td class="v">${o.peak!=null?fmt(o.peak,1)+" kg":"–"}</td></tr>`;}).join("")}</table></div>`;
+  const list=(S.gripTrain||[]).slice().sort((a,b)=>(a.date+(a.time||""))<(b.date+(b.time||""))?1:-1).slice(0,25);
+  h+=`<div class="grouplab">Verlauf</div>`+(list.length?`<div class="list">${list.map(g=>{const c=gtCalc(g);return `<div class="li" style="align-items:flex-start"><div class="grow"><div class="t">${fmtDate(g.date)}${g.time?" "+esc(g.time):""} · ${esc(g.program||"–")} <span class="tchip ${g.source==="sensor"?"hold":"weighted"}">${g.source==="sensor"?"Sensor":"manuell"}</span></div>
+      <div class="s">${gtKind(g)==="test"?"<b>Test</b> · ":""}${g.source==="sensor"?"":gtSideLabel(g)+" · "}${g.sets&&g.reps&&g.sec?`${g.sets}×${g.reps}×${g.sec}s · `:""}${g.load!=null?"Ø "+fmt(g.load,1)+" kg · ":""}${g.peak!=null?"Peak "+fmt(g.peak,1)+" kg · ":""}${c.vol!=null?Math.round(c.vol).toLocaleString("de-CH")+" kg·s":""}${g.mvc!=null?" · "+Math.round(g.mvc)+" % MVC":""}${g.note?" · "+esc(g.note):""}</div></div>
+      ${g.source!=="sensor"?`<button class="btn ghost small" data-act="gtEdit" data-id="${g.id}" aria-label="Bearbeiten">✎</button>`:""}<button class="x" data-act="gtDel" data-id="${g.id}" aria-label="Löschen">×</button></div>`;}).join("")}</div>`:`<div class="list"><div class="empty">Noch kein Griffkraft-Training erfasst.</div></div>`);
+  return h;}
+/* ---- Presets fürs Griffkraft-Training ---- */
+let gtPresetEdit=false;
+const gtPresets=()=>(S.settings.gripPresets=S.settings.gripPresets||[]);
+function gtPresetSub(p){return [p.kind==="test"?"Test":"",p.program,gtSideLabel(p),p.sets&&p.reps&&p.sec?`${p.sets}×${p.reps}×${p.sec}s`:"",p.load!=null?`${fmt(p.load,1)} kg`:""].filter(Boolean).join(" · ");}
+function gtLastFor(program){const l=(S.gripTrain||[]).filter(g=>g.program===program&&g.load!=null).sort((a,b)=>a.date<b.date?1:-1)[0];return l||null;}
+function gtPresetBar(ed){
+  if(ed)return "";const P=gtPresets();
+  return `<div class="card stack"><div class="row"><b class="grow">Presets</b>${P.length?`<button class="btn ghost small" data-act="gtPresetEdit">${gtPresetEdit?"Fertig":"Verwalten"}</button>`:""}</div>
+    ${P.length?(gtPresetEdit
+      ?`<div class="list">${P.map((p,i)=>`<div class="li"><div class="grow"><div class="t">${esc(p.name)}</div><div class="s">${esc(gtPresetSub(p))}</div></div>
+          <button class="btn ghost small" data-act="gtPresetMove" data-i="${i}" data-d="-1" ${i===0?"disabled":""} aria-label="nach oben">↑</button>
+          <button class="btn ghost small" data-act="gtPresetRename" data-id="${p.id}" aria-label="Umbenennen">✎</button>
+          <button class="btn ghost small" data-act="gtPresetUpdate" data-id="${p.id}" title="Mit den aktuellen Formularwerten überschreiben">⤓</button>
+          <button class="x" data-act="gtPresetDel" data-id="${p.id}" aria-label="Löschen">×</button></div>`).join("")}</div>
+        <p class="hint" style="margin:0">⤓ übernimmt die Werte, die gerade im Formular stehen.</p>`
+      :`<div class="chips">${P.map(p=>`<button class="chip" data-act="gtPresetUse" data-id="${p.id}" title="${esc(gtPresetSub(p))}">${esc(p.name)}</button>`).join("")}</div>
+        <p class="hint" style="margin:0">Antippen füllt das Formular — Datum bleibt, die Werte kannst du vor dem Speichern anpassen.</p>`)
+      :`<p class="hint" style="margin:0">Noch keine Presets. Füll das Formular aus und tippe unten auf „Als Preset speichern“ — z. B. „Max Hangs 20 mm“ oder „Repeaters 7/3“.</p>`}
+  </div>`;}
+/* ===== GRIFFKRAFT-TIMER =====
+   Ablauf: 5 s Vorbereitung → (Satz: Wdh: Hang sec, Pause restRep) → Satzpause … Unilateral: pro Satz erst links, dann rechts. */
+function gtPlan(d){const sets=Math.max(0,Math.round(d.sets||0)),reps=Math.max(0,Math.round(d.reps||0)),sec=+d.sec||0;if(!sets||!reps||!sec)return [];
+  const rr=+d.restRep||0,rs=+d.restSet||0;const sides=gtKind(d)==="train"&&gtLat(d)==="uni"?["links","rechts"]:gtKind(d)==="test"&&d.hand==="left"?["links"]:gtKind(d)==="test"&&d.hand==="right"?["rechts"]:[""];
+  const out=[{t:"prep",dur:5,label:"Bereit machen"}];
+  for(let s=1;s<=sets;s++){sides.forEach((side,si)=>{for(let r=1;r<=reps;r++){out.push({t:"work",dur:sec,label:"Halten"+(side?" · "+side:""),set:s,rep:r,side});
+        const lastRep=r===reps;if(!lastRep&&rr)out.push({t:"rest",dur:rr,label:"Pause",set:s,rep:r,side});}
+      if(si<sides.length-1)out.push({t:"rest",dur:Math.max(rr,10),label:"Seitenwechsel → "+sides[si+1],set:s,side});});
+    if(s<sets&&rs)out.push({t:"setrest",dur:rs,label:"Satzpause",set:s});}
+  return out;}
+let gtT=null;
+function gtBeep(f,ms){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;gtBeep.ac=gtBeep.ac||new C();const ac=gtBeep.ac;if(ac.state==="suspended")ac.resume();
+  const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type="sine";g.gain.setValueAtTime(0.0001,ac.currentTime);g.gain.exponentialRampToValueAtTime(0.5,ac.currentTime+0.01);g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+ms/1000);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+ms/1000+0.02);}catch(_){}}
+async function gtWake(on){try{if(on&&"wakeLock" in navigator){gtT.lock=await navigator.wakeLock.request("screen");}else if(!on&&gtT&&gtT.lock){await gtT.lock.release();gtT.lock=null;}}catch(_){}
+  try{const KA=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.KeepAwake;if(KA)on?KA.keepAwake():KA.allowSleep();}catch(_){}}
+function gtTimerStart(d){const plan=gtPlan(d);if(!plan.length){toast("Für den Timer Sätze, Wdh und Sek/Wdh ausfüllen");return;}
+  gtBeep(660,60);gtT={plan,i:0,endAt:Date.now()+plan[0].dur*1000,paused:false,remain:plan[0].dur,lastSec:null,d:Object.assign({},d)};gtWake(true);gtTimerRender();
+  gtT.iv=setInterval(gtTick,150);}
+function gtTick(){if(!gtT||gtT.paused)return;const st=gtT.plan[gtT.i];const rem=Math.max(0,(gtT.endAt-Date.now())/1000);gtT.remain=rem;const s=Math.ceil(rem);
+  if(s!==gtT.lastSec){gtT.lastSec=s;if(s<=3&&s>0)gtBeep(st.t==="work"?520:880,90);gtTimerRender();}
+  if(rem<=0)gtNext();}
+function gtNext(){gtT.i++;if(gtT.i>=gtT.plan.length){gtTimerFinish();return;}const st=gtT.plan[gtT.i];gtT.endAt=Date.now()+st.dur*1000;gtT.lastSec=null;
+  if(st.t==="work"){gtBeep(1046,280);try{navigator.vibrate&&navigator.vibrate(200);}catch(_){}}else{gtBeep(392,350);try{navigator.vibrate&&navigator.vibrate([80,60,80]);}catch(_){}}gtTimerRender();}
+function gtTimerFinish(){clearInterval(gtT.iv);gtWake(false);gtBeep(784,200);setTimeout(()=>gtBeep(1046,400),220);try{navigator.vibrate&&navigator.vibrate([200,100,200]);}catch(_){}
+  const d=gtT.d;gtT=null;$("#modalRoot").innerHTML="";
+  openModal(`<h3>Fertig 💪</h3><p class="hint">${esc(d.program||"Griffkraft")} · ${gtSideLabel(d)} · ${d.sets}×${d.reps}×${d.sec}s</p>
+    <p class="hint">Trag jetzt ${gtKind(d)==="test"?"den Max-Wert (Peak)":"Last und ggf. Peak"} ein und speichere die Einheit.</p>
+    <div class="acts"><button class="btn primary" data-act="closeModal">Zum Formular</button></div>`);
+  setTimeout(()=>{const el=document.getElementById(gtKind(d)==="test"?"gt_peak":"gt_load");if(el){el.scrollIntoView({block:"center"});}},150);}
+function gtTimerStop(){if(!gtT)return;clearInterval(gtT.iv);gtWake(false);gtT=null;$("#modalRoot").innerHTML="";}
+function gtTimerRender(){if(!gtT)return;const st=gtT.plan[gtT.i];const nx=gtT.plan[gtT.i+1];const sec=Math.ceil(gtT.paused?gtT.remain:Math.max(0,(gtT.endAt-Date.now())/1000));
+  const totalWork=gtT.plan.filter(x=>x.t==="work").length,doneWork=gtT.plan.slice(0,gtT.i).filter(x=>x.t==="work").length;const d=gtT.d;
+  const sets=d.sets,reps=d.reps;
+  $("#modalRoot").innerHTML=`<div class="gtt ${st.t}"><div class="gtt-top"><span>${esc(d.program||"Griffkraft")} · ${gtSideLabel(d)}</span><button class="gtt-x" data-act="gtTStop" aria-label="Timer beenden">×</button></div>
+    <div class="gtt-label">${esc(st.label)}</div><div class="gtt-time">${sec}</div>
+    <div class="gtt-pos">${st.set?`Satz ${st.set}/${sets}`:""}${st.rep&&st.t==="work"?` · Wdh ${st.rep}/${reps}`:""}</div>
+    <div class="gtt-bar"><i style="width:${Math.round(doneWork/totalWork*100)}%"></i></div>
+    <div class="gtt-next">${nx?`Danach: ${esc(nx.label)} · ${nx.dur} s`:"Danach: fertig"}</div>
+    <div class="gtt-acts"><button class="btn" data-act="gtTPause">${gtT.paused?"▶ Weiter":"❚❚ Pause"}</button><button class="btn" data-act="gtTSkip">⏭ Weiter</button></div></div>`;}
+function gtReadForm(){const d=gtDraft;const v=id=>{const el=document.getElementById(id);return el?el.value:"";};d.date=getDate("gt_date");d.program=v("gt_prog").trim();d.note=v("gt_note").trim();
+  ["sets","reps","sec","load","peak"].forEach(k=>{d[k]=num(v("gt_"+k));});d.restRep=num(v("gt_rr"));d.restSet=num(v("gt_rs"));}
+function gtTimerSummary(d){const t=gtPlan(d);if(!t.length)return "";const sec=t.reduce((a,x)=>a+x.dur,0);return `· ${Math.floor(sec/60)}:${String(Math.round(sec%60)).padStart(2,"0")} min`;}
+function viewKraft(){
+  let h=`<div class="viewhead"><h2>Kraft</h2><div class="sub">Krafttraining je Woche · Griffkraft-Training · Kraftmessung (Recovery: Griff, Sprung)</div></div>`+subtabs([["str","Krafttraining"],["griff","Griffkraft-Training"],["mess","Kraftmessung"]],UI.kraft,"kraftTab");
+  return h+(UI.kraft==="str"?viewStr():UI.kraft==="griff"?viewGriffTraining():viewMess());}
+function viewStr(){
+  const editing=strEditId?S.str.find(w=>w.id===strEditId):null;if(!editing)strEditId=null;if(!draftStr.length)draftStr=[blankEx()];
+  const locs=strLocations();
+  const locSel=locs.length?`<div><label class="fldlab" for="f_loc">Trainingsort <i>— filtert die Übungsauswahl aufs vorhandene Material</i></label><select id="f_loc"><option value="" ${!draftStrLocation?"selected":""}>Alle Übungen (kein Ort)</option>${locs.map(l=>`<option value="${l.id}" ${draftStrLocation===l.id?"selected":""}>${esc(l.name)}</option>`).join("")}</select></div>`
+    :`<p class="hint" style="margin:0">Tipp: Lege unter Mehr ▸ <b>Trainingsorte &amp; Material</b> an, um die Übungsauswahl auf das vor Ort verfügbare Material zu filtern.</p>`;
+  let h=`<div class="card stack" ${editing?'style="border-color:var(--recovery)"':""}><h3>Krafttraining — ${editing?"Woche bearbeiten":"neue Woche"}</h3>
+    ${editing?`<p class="hint" style="margin:0;color:var(--recovery)">Du bearbeitest die Woche vom ${editing.date}. „Woche speichern“ überschreibt den Eintrag.</p>`:`<p class="hint" style="margin:0">Übung aus dem Katalog wählen, dann jeden Satz einzeln. Der Lasttyp bestimmt die Eingabe: <b>Reps × kg</b>, <b>Reps × Körpergewicht</b> (+ optional Zusatz-/Assistenzlast) oder <b>Halten in Sekunden</b>.</p>`}
+    ${dateField("f_date",editing?editing.date:null)}${locSel}
+    <div id="strExercises"></div>
+    <div class="row wrapok"><button class="btn small" data-act="strAddEx">+ Übung</button><button class="btn small ghost" data-act="strCatalog">Katalog verwalten</button></div>
+    <div class="grid2"><div><label class="fldlab" for="f_n">Sessions</label><input id="f_n" type="number" inputmode="numeric" value="${editing&&editing.n!=null?editing.n:""}"></div>
+    <div><label class="fldlab" for="f_note">Notiz</label><input id="f_note" type="text" placeholder="optional" value="${esc(editing?editing.note||"":"")}"></div></div>
+    <div class="row"><button class="btn primary grow" data-act="strSave">Woche speichern</button>${editing?`<button class="btn ghost" data-act="strCancel">Abbrechen</button>`:""}</div></div>`;
+  // Verlauf
+  if(!S.str.length)return h+`<div class="grouplab">Verlauf</div><div class="list"><div class="empty">Noch keine Wochen erfasst.</div></div>`;
+  h+=`<div class="grouplab">Verlauf <span style="font-weight:500">· Datum antippen für die Sätze · Ø Last = rep-gewichtetes Gewicht</span></div><div class="card tblwrap" style="padding:4px 8px"><table class="log"><tr><th>Datum</th><th>Volumen</th><th>Ø Last</th><th>Sess.</th><th></th></tr>`;
+  S.str.forEach((w,i)=>{const v=strEntryVol_(w),p=S.str[i+1]?strEntryVol_(S.str[i+1]):{};const tr=(a,b)=>a!=null&&b!=null&&a!==b?(a>b?' <span style="color:var(--pos)">▲</span>':' <span style="color:var(--neg)">▼</span>'):"";
+    h+=`<tr ${w.id===strEditId?'style="background:var(--recovery-soft)"':""}><td class="v"><span class="linky" data-act="strDet" data-i="${i}">${w.date} ›</span><div class="meta">${kwLabel(w.date)}${w.location?" · @ "+esc(w.location):""}</div></td>
+      <td class="v">${v.vol!=null?Math.round(v.vol).toLocaleString("de-CH"):"–"}${tr(v.vol,p.vol)}</td><td class="v">${v.inten??"–"}${tr(v.inten,p.inten)}</td><td class="v">${w.n||"–"}</td>
+      <td style="white-space:nowrap"><button class="btn ghost small" data-act="strEdit" data-id="${w.id}" aria-label="Bearbeiten">✎</button><button class="x" data-act="strDel" data-id="${w.id}" aria-label="Löschen">×</button></td></tr>`;
+    h+=`<tr class="det hidden" id="strDetail${i}"><td colspan="5">${(w.exercises||[]).map(ex=>{const lt=strLoadType_(ex);
+      const sets=(ex.sets||[]).map(st=>{if(lt==="hold"){const a=+st.addedKg||0;return st.sec+"s"+(a?` +${a}kg`:"");}
+        if(lt==="bodyweight"){const a=+st.addedKg||0;const e=strEffLoad_(ex,st,w.bw!=null?+w.bw:bwForDate_(w.date));return st.reps+"×"+(a?`KG+${a}`:"KG")+` (≈${e?Math.round(e):"–"}kg)`;}return st.reps+"×"+st.kg+"kg";}).join(" · ");
+      return `<div style="margin:3px 0"><b style="color:var(--ink)">${esc(ex.name)}</b>${lt!=="weighted"?` <span class="tchip ${lt}">${STR_TYPE_LABEL[lt]}</span>`:""}${ex.unilateral?' <span class="meta">uni</span>':""}: ${esc(sets)}</div>`;}).join("")}${w.note?`<div style="margin-top:4px">Notiz: ${esc(w.note)}</div>`:""}</td></tr>`;});
+  return h+`</table></div>`;}
+function renderStrExercises(){
+  const host=$("#strExercises");if(!host)return;const bw=bwForDate_(getDate("f_date"));const loc=draftStrLocation?strLocationById_(draftStrLocation):null;const availAt=e=>strExAvailableAt_(e,loc);
+  host.innerHTML=draftStr.map((ex,ei)=>{const lt=ex.loadType||"weighted";
+    const opts=STR_CATS.map(([ck,cn])=>{const items=S.strExercises.filter(e=>(e.category||"other")===ck).filter(e=>availAt(e)||ex.exerciseId===e.id);if(!items.length)return "";
+      return `<optgroup label="${cn}">`+items.map(e=>`<option value="${e.id}" ${ex.exerciseId===e.id?"selected":""}>${esc(e.name)}${e.loadType&&e.loadType!=="weighted"?" · "+STR_TYPE_LABEL[e.loadType]:""}${!availAt(e)?" ⚠︎":""}</option>`).join("")+`</optgroup>`;}).join("");
+    return `<div class="exc"><div class="hd" style="align-items:center"><select data-strpick="${ei}" class="grow" aria-label="Übung ${ei+1}"><option value="" ${!ex.exerciseId?"selected":""}>— Übung wählen —</option>${opts}<option value="__new">＋ neue Übung…</option></select>
+      ${ex.exerciseId?`<span class="tchip ${lt}">${STR_TYPE_LABEL[lt]}</span>`:""}${draftStr.length>1?`<button class="x" data-act="strRmEx" data-ei="${ei}" aria-label="Übung entfernen">×</button>`:""}</div>
+      ${lt!=="weighted"?`<div class="meta" style="margin:2px 0 4px">Körpergewicht ${bw!=null?"≈ "+Math.round(bw)+" kg":"—"} · Faktor ${Math.round((ex.bwCoeff!=null?ex.bwCoeff:0.65)*100)}%${bw==null?" · Gewicht im Tab „Gewicht“ erfassen oder Standard unter Mehr":""}</div>`:""}
+      ${ex.sets.map((st,si)=>{const r=st.rir;const on=b=>r!=null&&r!==""&&+r===b;let inputs;
+        if(lt==="hold")inputs=`<input type="number" inputmode="numeric" placeholder="Sek" value="${esc(st.sec??"")}" data-str="${ei}|${si}|sec" aria-label="Sekunden"><span class="x2">Sek ·</span><input type="number" inputmode="decimal" placeholder="+kg" value="${esc(st.addedKg??"")}" data-str="${ei}|${si}|addedKg" aria-label="Zusatzlast"><span class="eff" id="eff${ei}_${si}">≈ ${bw!=null?Math.round(strEffLoad_(ex,st,bw))+" kg":"–"}</span>`;
+        else if(lt==="bodyweight")inputs=`<input type="number" inputmode="numeric" placeholder="Reps" value="${esc(st.reps??"")}" data-str="${ei}|${si}|reps" aria-label="Wiederholungen"><span class="x2">× KG</span><input type="number" inputmode="decimal" placeholder="+kg" value="${esc(st.addedKg??"")}" data-str="${ei}|${si}|addedKg" aria-label="Zusatzlast"><span class="eff" id="eff${ei}_${si}">≈ ${bw!=null?Math.round(strEffLoad_(ex,st,bw))+" kg":"–"}</span>`;
+        else inputs=`<input type="number" inputmode="numeric" placeholder="Reps" value="${esc(st.reps??"")}" data-str="${ei}|${si}|reps" aria-label="Wiederholungen"><span class="x2">×</span><input type="number" inputmode="decimal" placeholder="kg" value="${esc(st.kg??"")}" data-str="${ei}|${si}|kg" aria-label="kg">`;
+        return `<div class="strset"><div class="strrow"><span class="n">${si+1}</span>${inputs}${ex.sets.length>1?`<button class="x" data-act="strRmSet" data-ei="${ei}" data-si="${si}" aria-label="Satz löschen">×</button>`:""}</div>
+          <div class="rir"><span>RIR</span>${RIR_BANDS.map(([v,l])=>`<button type="button" class="${on(v)?"on":""}" data-act="strRir" data-ei="${ei}" data-si="${si}" data-v="${v}">${l}</button>`).join("")}</div></div>`;}).join("")}
+      <button class="btn small ghost" style="margin-top:6px" data-act="strAddSet" data-ei="${ei}">+ Satz</button></div>`;}).join("");}
+function strApplyExToDraft_(d,e){const old=d.loadType||"weighted";d.exerciseId=e.id;d.name=e.name;d.category=e.category||"other";d.unilateral=!!e.unilateral;d.loadType=e.loadType||"weighted";
+  d.bwCoeff=e.bwCoeff!=null?+e.bwCoeff:strBwCoeffDefault_(e.name);if(d.loadType!==old||!d.sets.length)d.sets=[strBlankSet_(d.loadType)];}
+function strPickExercise(ei,val){
+  if(val==="__new"){strAddExerciseModal(ne=>{strApplyExToDraft_(draftStr[ei],ne);renderStrExercises();});renderStrExercises();return;}
+  if(!val){draftStr[ei]=blankEx();renderStrExercises();return;}const e=strExById_(val);if(e)strApplyExToDraft_(draftStr[ei],e);renderStrExercises();}
+function addStrength(){
+  const date=getDate("f_date");const bw=bwForDate_(date);const exercises=[];let missing=false;
+  const rir=st=>(st.rir==null||st.rir==="")?null:+st.rir;const addK=st=>(st.addedKg===""||st.addedKg==null)?0:+st.addedKg;
+  draftStr.forEach(ex=>{const lt=ex.loadType||"weighted";let sets;
+    if(lt==="hold")sets=ex.sets.filter(st=>(+st.sec)>0).map(st=>({sec:+st.sec,addedKg:addK(st),rir:rir(st)}));
+    else if(lt==="bodyweight")sets=ex.sets.filter(st=>(+st.reps)>0).map(st=>({reps:+st.reps,addedKg:addK(st),rir:rir(st)}));
+    else sets=ex.sets.filter(st=>(+st.reps)>0&&(+st.kg)>=0).map(st=>({reps:+st.reps,kg:+st.kg,rir:rir(st)}));
+    if(!sets.length)return;if(!ex.exerciseId){missing=true;return;}
+    const saved={exerciseId:ex.exerciseId,name:ex.name||"Übung",category:ex.category||"other",unilateral:!!ex.unilateral,loadType:lt,sets};if(lt!=="weighted")saved.bwCoeff=ex.bwCoeff!=null?+ex.bwCoeff:0.65;exercises.push(saved);});
+  if(missing){toast("Für jede Übung mit Sätzen eine Katalog-Übung wählen");return;}
+  if(!exercises.length){toast("Mindestens einen Satz eingeben");return;}
+  // PR-Erkennung vor dem Einfügen (wie Monitor): 1RM ≤5 Reps, sonst Reps-PR (Körpergewicht), Halten = längster Halt
+  const editing=strEditId?S.str.find(w=>w.id===strEditId):null;const bak=editing?S.str.splice(S.str.indexOf(editing),1)[0]:null;const prMsgs=[];
+  exercises.forEach(ex=>{const key=ex.exerciseId;
+    if(ex.loadType==="hold"){const prev=strBestHold_(key);let ns=0;ex.sets.forEach(st=>{if(+st.sec>ns)ns=+st.sec;});if(ns>0&&(prev==null||ns>prev))prMsgs.push(ex.name+" "+ns+" s");return;}
+    const prev=strBestPR_(key);let ne=null;ex.sets.forEach(st=>{const e=e1rm_(strEffLoad_(ex,st,bw),st.reps);if(e!=null&&(ne==null||e>ne))ne=e;});
+    if(ne!=null&&(prev==null||ne>prev+0.001)){prMsgs.push(ex.name+" ≈ "+Math.round(ne)+" kg");return;}
+    if(ex.loadType==="bodyweight"){const pr=strBestReps_(key,true);let nr=0,bo=false;ex.sets.forEach(st=>{if((+st.addedKg||0)<=0){bo=true;if(+st.reps>nr)nr=+st.reps;}});if(bo&&nr>0&&(pr==null||nr>pr))prMsgs.push(ex.name+" "+nr+" Reps");}});
+  if(bak)S.str.push(bak);
+  const loc=draftStrLocation?strLocationById_(draftStrLocation):null;
+  const rec={id:editing?editing.id:uid("sw"),date,bw,exercises,locationId:loc?loc.id:null,location:loc?loc.name:null,n:+$("#f_n").value||0,note:$("#f_note").value};
+  if(editing){const i=S.str.findIndex(w=>w.id===editing.id);S.str[i]=rec;}else S.str.unshift(rec);sortDesc(S.str);
+  strEditId=null;draftStr=[blankEx()];draftStrLocation=null;persist();render();
+  toast(prMsgs.length?"Neuer PR: "+prMsgs.join(" · "):(editing?"Woche aktualisiert":"Gespeichert"));}
+function strEditWeek(id){const w=S.str.find(x=>x.id===id);if(!w)return;strEditId=id;draftStrLocation=w.locationId||null;
+  draftStr=(w.exercises||[]).map(ex=>({exerciseId:ex.exerciseId,name:ex.name,category:ex.category||"other",unilateral:!!ex.unilateral,loadType:ex.loadType||"weighted",bwCoeff:ex.bwCoeff!=null?ex.bwCoeff:null,sets:(ex.sets||[]).map(st=>Object.assign({},st))}));
+  if(!draftStr.length)draftStr=[blankEx()];render();window.scrollTo(0,0);}
+
+/* ---- Katalog (Modal) ---- */
+function strAddExerciseModal(cb){
+  inputModal({title:"Neue Übung",saveLabel:"Anlegen",fields:[
+    {key:"name",label:"Name",placeholder:"z.B. Kreuzheben, Klimmzug, Plank",required:true},
+    {key:"cat",label:"Kategorie",type:"buttons",value:STR_CATS[0][0],options:STR_CATS.map(([v,l])=>({label:l,value:v}))},
+    {key:"lt",label:"Lasttyp",type:"buttons",value:"weighted",options:[{label:"Gewicht (Reps × kg)",value:"weighted"},{label:"Körpergewicht (Reps)",value:"bodyweight"},{label:"Halten (Sekunden)",value:"hold"}]},
+    {key:"coeff",label:"KG-Faktor in % (nur Körpergewicht/Halten · Anteil des Körpergewichts, der bewegt wird)",type:"number",placeholder:"z.B. 100 = Klimmzug, 64 = Liegestütz"},
+    {key:"uni",label:"Ausführung",type:"buttons",value:"bi",options:[{label:"bilateral",value:"bi"},{label:"unilateral (Tonnage ×2)",value:"uni"}]}],
+    onSave:v=>{const name=v.name.trim();if(!name)return;const lt=v.lt||"weighted";const ex={id:uid("sx"),name,category:v.cat||"other",unilateral:v.uni==="uni",loadType:lt,materials:[],tested:[]};
+      if(lt!=="weighted"){let c=parseFloat(v.coeff);c=(isFinite(c)&&c>0)?c/100:strBwCoeffDefault_(name);ex.bwCoeff=Math.max(0.05,Math.min(2,c));}
+      S.strExercises.push(ex);persist();if(cb)cb(ex);toast("Übung angelegt");}});}
+function strOpenCatalog(){
+  openModal(`<h3>Übungs-Katalog</h3><p class="hint">Übungen mit Kategorie und Lasttyp. Körpergewichtsübungen zählen mit ihrer effektiven Last (Körpergewicht × Faktor + Zusatz). Änderungen wirken auf künftige Einträge; erfasste Wochen behalten ihren Snapshot. „Fokus“ markiert Übungen für das Recovery-Signal der Planung.</p>
+    <div><label class="fldlab" for="strDefBw">Standard-Körpergewicht (kg) <i>— Fallback, wenn kein Gewichts-Log am Trainingstag</i></label><input id="strDefBw" type="number" inputmode="decimal" placeholder="z.B. 75" value="${S.settings.defaultBodyweight||""}"></div>
+    <div id="strCatList" class="catlist" style="margin-top:10px"></div>
+    <div class="acts"><button class="btn" data-act="strCatAdd">+ Übung</button><button class="btn primary" data-act="closeModalRender">Schließen</button></div>`);
+  $("#strDefBw").onchange=e=>{const n=parseFloat(e.target.value);S.settings.defaultBodyweight=(isFinite(n)&&n>0)?n:null;persist();};strRenderCatalogList_();}
+function strRenderCatalogList_(){
+  const host=$("#strCatList");if(!host)return;const list=S.strExercises;if(!list.length){host.innerHTML='<div class="empty">Noch keine Übungen. Über „+ Übung“ anlegen.</div>';return;}
+  host.innerHTML=STR_CATS.map(([ck,cn])=>{const items=list.filter(e=>(e.category||"other")===ck);if(!items.length)return "";
+    return `<div class="grouplab" style="margin:12px 0 2px">${cn}</div>`+items.map(e=>{const lt=strLoadType_(e);const pr=strBestPR_(e.id),prR=strBestPRRir_(e.id);let prLine;
+      if(lt==="hold"){const bh=strBestHold_(e.id);prLine="Bester Halt "+(bh!=null?bh+" s":"—");}
+      else if(lt==="bodyweight"){const br=strBestReps_(e.id,true);prLine="Reps-PR "+(br!=null?br+"×":"—")+(pr!=null?" · 1RM ≈ "+Math.round(pr)+" kg":"");}
+      else prLine="PR roh "+(pr!=null?"≈ "+Math.round(pr)+" kg":"—")+(prR!=null?" · RIR ≈ "+Math.round(prR)+" kg":"");
+      const mats=strExMaterials_(e);
+      return `<div class="item"><div><b>${esc(e.name)}</b> <span class="tchip ${lt}">${STR_TYPE_LABEL[lt]}</span>${e.focus?' <span class="focusbadge">Fokus</span>':""}</div>
+        <div class="meta">${e.unilateral?"unilateral · ":""}${prLine}${lt!=="weighted"?" · Faktor "+Math.round((e.bwCoeff!=null?e.bwCoeff:0.65)*100)+"%":""}${mats.length?" · Material: "+esc(mats.join(", ")):""}</div>
+        ${(e.tested||[]).length?`<div class="chips" style="margin-top:4px">${e.tested.map((t,ti)=>`<button class="ftag" data-act="catDelTest" data-id="${e.id}" data-ti="${ti}" title="Entfernen">${t.kg} kg · ${t.date} ×</button>`).join("")}</div>`:""}
+        ${strMaterials().length?`<div class="chips" style="margin-top:5px">${strMaterials().map(m=>`<button class="ftag ${mats.includes(m)?"on":""}" data-act="catMat" data-id="${e.id}" data-m="${esc(m)}">${mats.includes(m)?"✓ ":""}${esc(m)}</button>`).join("")}</div>`:""}
+        <div class="acts"><button class="btn ghost" data-act="catType" data-id="${e.id}">${STR_TYPE_LABEL[lt]}</button>${lt!=="weighted"?`<button class="btn ghost" data-act="catCoeff" data-id="${e.id}">%</button>`:""}
+          <button class="btn ghost" data-act="catUni" data-id="${e.id}">${e.unilateral?"uni":"bi"}</button>${lt==="weighted"?`<button class="btn ghost" data-act="catTest" data-id="${e.id}">1RM+</button>`:""}
+          <button class="btn ghost" data-act="catCat" data-id="${e.id}" title="Kategorie wechseln">↺ Kategorie</button><button class="btn ghost" data-act="catFocus" data-id="${e.id}">${e.focus?"★ Fokus":"☆ Fokus"}</button>
+          <button class="btn ghost" data-act="catRename" data-id="${e.id}">✎</button><button class="btn ghost danger" data-act="catDel" data-id="${e.id}">×</button></div></div>`;}).join("");}).join("");}
+
+/* =====================================================================
+   KRAFTMESSUNG — Griff mit Phase · Sprung-Import · L/R-Balance
+   ===================================================================== */
+let measPhase="",measEditId=null;
+function viewMess(){
+  const ed=measEditId?S.measures.find(m=>m.id===measEditId):null;if(!ed)measEditId=null;measPhase=ed&&ed.phase?ed.phase:measPhase;
+  let h=`<div class="card stack"><h3>Kraftmessung — ${ed?"bearbeiten":"neue Messung"}</h3><p class="hint" style="margin:0">Griffkraft links &amp; rechts, mit Phase</p>
+    ${dateField("m_date",ed?ed.date:null)}
+    <div><span class="fldlab">Phase <span class="warn">*</span></span><div class="chips" id="measPhaseBtns">${measPhaseBtns_()}</div></div>
+    <div class="grid2"><div><label class="fldlab" for="m_gl">Griff L (kg)</label><input id="m_gl" type="number" inputmode="decimal" value="${ed&&ed.gl!=null?ed.gl:""}"></div><div><label class="fldlab" for="m_gr">Griff R (kg)</label><input id="m_gr" type="number" inputmode="decimal" value="${ed&&ed.gr!=null?ed.gr:""}"></div></div>
+    <div class="meta">LSI ${info("lsi")} <span id="m_lsi" class="pillb"></span></div>
+    <div><label class="fldlab" for="m_note">Notiz</label><input id="m_note" type="text" placeholder="z.B. müde, locker, …" value="${esc(ed?ed.note||"":"")}"></div>
+    <div class="row">${ed?`<button class="btn ghost" data-act="measCancel">Abbrechen</button>`:""}<button class="btn primary grow" data-act="measSave">${ed?"Änderungen speichern":"Messung speichern"}</button></div></div>`;
+  h+=`<div class="grouplab">Griffkraft-Verlauf</div>`;
+  h+=S.measures.length?`<div class="card tblwrap" style="padding:4px 8px"><table class="log"><tr><th>Datum</th><th>Phase</th><th>L</th><th>R</th><th>LSI</th><th></th></tr>${S.measures.map(m=>{const v=lsi(m.gl,m.gr);
+      return `<tr><td class="v">${m.date}</td><td class="meta">${esc(m.phase||"–")}</td><td class="v">${fmt(m.gl,1)}</td><td class="v">${fmt(m.gr,1)}</td><td class="v">${v!=null?`<span class="pillb ${band(v)}">${fmt(v,1)} %</span>`:"–"}</td>
+        <td style="white-space:nowrap"><button class="btn ghost small" data-act="measEdit" data-id="${m.id}" aria-label="Bearbeiten">✎</button><button class="x" data-act="measDel" data-id="${m.id}" aria-label="Löschen">×</button></td></tr>${m.note?`<tr class="det"><td colspan="6">${esc(m.note)}</td></tr>`:""}`;}).join("")}</table></div>`
+    :`<div class="list"><div class="empty">Noch keine Messungen.</div></div>`;
+  // Sprung
+  h+=`<div class="grouplab">Sprung (Sensor-Import)</div><div class="card stack"><p class="hint" style="margin:0">Exportiere die Datei des Sprungsensors (Blatt „All“) und lade sie hier. Doppelte Sessions (gleiche Zeit + Bein) werden erkannt. Liegt sie im verbundenen Drive-Ordner, übernimmt „Aus Ordner laden“ sie automatisch.</p>
+    <button class="btn block" data-act="pickJump">Sensor-Datei importieren</button></div>`;
+  if(S.jumps.length){const js=S.jumps.slice().sort((a,b)=>(a.date+a.time)<(b.date+b.time)?1:-1);
+    h+=`<div class="card tblwrap" style="padding:4px 8px"><table class="log"><tr><th>Datum</th><th>Zeit</th><th>Bein</th><th>Best</th><th>RSI</th><th>Wdh</th><th></th></tr>${js.map((j,i)=>{
+      const parts=[];if(j.mean!=null)parts.push(`Ø Sprunghöhe ${j.mean} cm`);if(j.mean_power_w!=null)parts.push(`Ø Leistung ${j.mean_power_w} W`);if(j.peak_power_w!=null)parts.push(`Max. Leistung ${j.peak_power_w} W`);
+      if(j.ttpv_ms!=null)parts.push(`Beste Zeit bis Spitzengeschw. ${j.ttpv_ms} ms`);if(j.ttpv_mean_ms!=null&&j.ttpv_mean_ms!==j.ttpv_ms)parts.push(`Ø Zeit bis Spitzengeschw. ${j.ttpv_mean_ms} ms`);
+      if(j.rsi_mean!=null&&j.rsi_mean!==j.rsi)parts.push(`Ø Reaktivkraft-Index ${j.rsi_mean}`);if(j.squat_mm!=null)parts.push(`Ø Kniebeugentiefe ${j.squat_mm} mm`);if(j.drill)parts.push(`Übung: ${j.drill}`);if(j.weight_kg)parts.push(`Zusatzlast ${j.weight_kg} kg`);
+      return `<tr><td class="v">${parts.length?`<span class="linky" data-act="jumpDet" data-i="${i}">${j.date} ›</span>`:j.date}</td><td class="v">${esc(j.time||"")}</td><td class="meta">${j.leg==="left"?"links":j.leg==="right"?"rechts":"beidbeinig"}</td><td class="v">${fmt(j.best,1)} cm</td><td class="v">${j.rsi??"–"}</td><td class="v">${j.reps??"–"}</td><td><button class="x" data-act="jumpDel" data-id="${j.id}" aria-label="Löschen">×</button></td></tr>
+        ${parts.length?`<tr class="det hidden" id="jumpDet${i}"><td colspan="7">${esc(parts.join(" · "))}</td></tr>`:""}`;}).join("")}</table></div>`;}
+  const days=jumpBalanceDays_();
+  if(days.length){h+=`<div class="grouplab">L/R-Balance (pro Tag, alle Metriken)</div>`+days.slice(0,8).map(d=>`<div class="balance"><b>${fmtDate(d.date)}</b><div class="tblwrap"><table class="log"><tr><th>Metrik</th><th>Links</th><th>Rechts</th><th>LSI</th><th>Δ</th></tr>
+    ${d.metrics.map(({M,bestL,bestR,lsi:l,asym,dominant})=>`<tr><td class="meta">${M.label}</td><td class="v">${bestL.toFixed(M.fix)}${M.unit?" "+M.unit:""}</td><td class="v">${bestR.toFixed(M.fix)}${M.unit?" "+M.unit:""}</td><td class="v"><span class="pillb ${band(l)}">${l} %</span></td><td class="meta">${dominant} +${asym}${M.unit?" "+M.unit:""}</td></tr>`).join("")}</table></div></div>`).join("");}
+  return h;}
+function measPhaseBtns_(){return MEAS_PHASES.map(p=>`<button type="button" class="chip" aria-pressed="${measPhase===p}" data-act="measPhase" data-v="${p}">${p}</button>`).join("");}
+const JUMP_METRICS=[
+  {key:"jump",label:"Sprunghöhe",get:j=>j.best,unit:"cm",bigger:"better",fix:1},{key:"rsi",label:"Reaktivkraft-Index",get:j=>j.rsi,unit:"",bigger:"better",fix:2},
+  {key:"mean_power",label:"Ø Leistung",get:j=>j.mean_power_w,unit:"W",bigger:"better",fix:0},{key:"peak_power",label:"Max. Leistung",get:j=>j.peak_power_w,unit:"W",bigger:"better",fix:0},
+  {key:"squat",label:"Kniebeugentiefe",get:j=>j.squat_mm,unit:"mm",bigger:"symmetric",fix:0},{key:"ttpv",label:"Zeit bis Spitzengeschw.",get:j=>j.ttpv_ms,unit:"ms",bigger:"smaller",fix:0}];
+function jumpBalanceDays_(){const by={};S.jumps.forEach(j=>{if(j.leg==="both")return;const d=by[j.date]||(by[j.date]={L:[],R:[]});(j.leg==="left"?d.L:d.R).push(j);});
+  const out=[];Object.keys(by).sort().reverse().forEach(date=>{const {L,R}=by[date];if(!L.length||!R.length)return;const metrics=[];
+    JUMP_METRICS.forEach(M=>{const l=L.map(M.get).filter(v=>v!=null),r=R.map(M.get).filter(v=>v!=null);if(!l.length||!r.length)return;
+      const bestL=M.bigger==="smaller"?Math.min(...l):Math.max(...l),bestR=M.bigger==="smaller"?Math.min(...r):Math.max(...r);const lo=Math.min(bestL,bestR),hi=Math.max(bestL,bestR);
+      const dominant=bestL===bestR?"=":M.bigger==="smaller"?(bestL<bestR?"L":"R")+" schneller":(bestL>bestR?"L":"R")+" stärker";
+      metrics.push({M,bestL,bestR,lsi:hi>0?+(lo/hi*100).toFixed(1):null,asym:+Math.abs(bestL-bestR).toFixed(M.fix),dominant});});
+    if(metrics.length)out.push({date,metrics});});return out;}
+function addMeasure(){
+  const gl=+$("#m_gl").value||0,gr=+$("#m_gr").value||0;if(!measPhase){toast("Bitte Phase wählen");return;}if(!gl&&!gr){toast("Mindestens einen Griffwert eingeben");return;}
+  const rec={id:measEditId||uid("m"),date:getDate("m_date"),phase:measPhase,gl:gl||null,gr:gr||null,note:$("#m_note").value};
+  if(measEditId){const i=S.measures.findIndex(m=>m.id===measEditId);S.measures[i]=rec;}else S.measures.unshift(rec);
+  sortDesc(S.measures);measEditId=null;measPhase="";persist();render();toast("Messung gespeichert");}
+
+/* =====================================================================
+   GEWICHT — mit Bedingungen, Referenzgewicht (wie Training Monitor)
+   ===================================================================== */
+let weightCond={fasted:null,toilet:null,clothed:null};
+function viewGewicht(){
+  let h=`<div class="viewhead"><h2>Gewicht</h2><div class="sub">Bedingungen ankreuzen · Referenzgewicht = nüchtern + ohne Kleidung</div></div>
+    <div class="card stack">${dateField("wt_date")}<div><label class="fldlab" for="wt_kg">Gewicht (kg)</label><input id="wt_kg" type="number" inputmode="decimal" placeholder="z.B. 72.4"></div>
+    <div id="wt_cond" class="stack">${weightCondHtml_()}</div>
+    <div><label class="fldlab" for="wt_note">Notiz</label><input id="wt_note" type="text" placeholder="optional"></div>
+    <button class="btn primary block" data-act="weightSave">Gewicht speichern</button></div>`;
+  if(!S.weight.length)return h+`<div class="list"><div class="empty">Noch keine Messungen.</div></div>`;
+  const wk=weeklyWeightStats();
+  h+=`<div class="grouplab">Wochenwerte</div><div class="grid2"><div class="kpi"><div class="k">Ø alle Messungen ${info("weightAvg")}</div><div class="v">${wk.avgAll??"–"}<small> kg</small></div></div>
+    <div class="kpi"><div class="k">Ø Referenz (nüchtern, ohne) ${info("weightRef")}</div><div class="v" style="color:var(--recovery)">${wk.avgRef??"–"}<small> kg</small></div></div></div>`;
+  h+=`<div class="grouplab">Verlauf</div><div class="card tblwrap" style="padding:4px 8px"><table class="log"><tr><th>Datum</th><th>kg</th><th>Bedingungen</th><th></th></tr>${S.weight.map(w=>{const c=w.cond||{};
+    const cond=[c.fasted===true?"nüchtern":c.fasted===false?"nicht nüchtern":"",c.toilet===true?"nach WC":"",c.clothed===true?"mit Kleidung":c.clothed===false?"ohne Kleidung":""].filter(Boolean).join(" · ");
+    return `<tr><td class="v">${w.date}</td><td class="v">${fmt(w.kg,1)}</td><td class="meta">${esc(cond||"–")}${w.note?"<br>"+esc(w.note):""}</td><td><button class="x" data-act="weightDel" data-id="${w.id}" aria-label="Löschen">×</button></td></tr>`;}).join("")}</table></div>`;
+  return h;}
+function weightCondHtml_(){return [["fasted","Nüchtern?","nüchtern","nicht nüchtern"],["toilet","Toilette?","nach WC","nicht"],["clothed","Kleidung?","mit Kleidung","ohne Kleidung"]].map(([k,lab,a,b])=>
+  `<div><span class="fldlab">${lab}</span><div class="opts"><button type="button" class="opt ${weightCond[k]===true?"g":""}" data-act="wCond" data-k="${k}" data-v="1">${a}</button><button type="button" class="opt ${weightCond[k]===false?"y":""}" data-act="wCond" data-k="${k}" data-v="0">${b}</button></div></div>`).join("");}
+function addWeight(){const kg=+$("#wt_kg").value||0;if(!kg){toast("Gewicht eingeben");return;}
+  S.weight.unshift({id:uid("w"),date:getDate("wt_date"),kg,cond:Object.assign({},weightCond),note:$("#wt_note").value});sortDesc(S.weight);
+  weightCond={fasted:null,toilet:null,clothed:null};persist();render();toast("Gewicht gespeichert");}
+
+/* =====================================================================
+   MEHR — Datei, Einstellungen (Reflexion, Tags, Orte & Material)
+   ===================================================================== */
+function viewMehr(){
+  const connected=!!dirHandle;
+  let h=`<div class="viewhead"><h2>Mehr</h2><div class="sub">Datei-Austausch über den gemeinsamen Drive-Ordner · Einstellungen</div></div>
+    <div class="card"><b>${FILE_TRACKING}</b><div class="hint">${esc(countsOf(S))}</div><div class="hint">${S.meta.dirty?'<span class="warn">Ungespeicherte Änderungen</span>':S.meta.lastSaved?"Zuletzt gespeichert "+new Date(S.meta.lastSaved).toLocaleString("de-CH"):"Noch nie gespeichert"}</div></div>`;
+  h+=`<div class="card stack"><h3>Verbundene Dateien</h3><div data-lnk-section>${LINK.sectionHtml()}</div></div>`;
+  if(fsSupported&&!LINK.available())h+=`<div class="card stack"><h3>Drive-Ordner ${connected?"· "+esc(dirHandle.name):""}</h3><p class="hint" style="margin:0">${connected?"Die App liest tracking.xlsx, den Plan und Sensor-Dateien aus diesem Ordner und schreibt tracking.xlsx zurück.":"Wähle den lokal synchronisierten Drive-Ordner (Google Drive für Desktop)."}</p>
+    <div class="row wrapok"><button class="btn ${connected?"":"primary"}" data-act="fsConnect">${connected?"Anderen Ordner wählen":"Ordner verbinden"}</button>${connected?`<button class="btn" data-act="fsLoad">Aus Ordner laden</button><button class="btn primary" data-act="fsSave">In Ordner speichern</button>`:""}</div>
+    ${connected?`<label class="row"><input type="checkbox" id="autoSave" ${UI.autoSave?"checked":""}> Nach jeder Änderung automatisch speichern</label><p class="hint" style="margin:0">Wurde die Excel inzwischen manuell geändert, hält die App an und fragt nach.</p>`:""}</div>`;
+  h+=`<div class="card stack"><h3>Manuell${fsSupported?"":" (Handy)"}</h3><div class="grid2"><button class="btn primary" data-act="export">Excel exportieren</button><button class="btn" data-act="pickTracking">Excel laden</button></div>
+    <button class="btn block" data-act="pickPlan">Plan laden (${FILE_PLAN})</button>
+    <p class="hint" style="margin:0">${phoneNative()||!fsSupported?`Auf dem Handy speichert „Exportieren“ nach <b>Dokumente/Training/${FILE_TRACKING}</b>. „Laden“ öffnet die Dateiauswahl — dort findest du Dokumente/Training und links auch Google Drive. „Ordner verbinden“ gibt es nur am Computer.`:`Nach dem Bearbeiten in Excel die Datei wieder laden — die Excel ist die Wahrheit.`}</p></div>`;
+  h+=`<details class="fold"><summary>Session-Reflexion &amp; Fokus-Tags</summary><div class="body">${SESS_SPORTS.map(([sp,label])=>{const qs=sessReflectionSet_(sp),tags=sessFocusReg_(sp);
+    return `<div style="margin-bottom:16px"><div class="grouplab" style="margin:8px 0 6px">${label}</div><div class="meta" style="margin-bottom:4px">Reflexionsfragen (aktuelles Set — gilt ab nächster Session)</div>
+      <div class="list">${qs.length?qs.map((q,i)=>`<div class="li"><div class="grow" style="font-size:14px">${esc(q.q)}</div><button class="btn ghost small" data-act="refMove" data-sp="${sp}" data-id="${q.id}" data-d="-1" ${i===0?"disabled":""} aria-label="nach oben">↑</button><button class="btn ghost small" data-act="refMove" data-sp="${sp}" data-id="${q.id}" data-d="1" ${i===qs.length-1?"disabled":""} aria-label="nach unten">↓</button><button class="btn ghost small" data-act="refRename" data-sp="${sp}" data-id="${q.id}" aria-label="Bearbeiten">✎</button><button class="x" data-act="refDel" data-sp="${sp}" data-id="${q.id}" aria-label="Löschen">×</button></div>`).join(""):'<div class="empty" style="padding:10px">Noch keine Fragen.</div>'}</div>
+      <button class="btn small ghost" style="margin-top:6px" data-act="refAdd" data-sp="${sp}">+ Frage</button>
+      <div class="meta" style="margin:10px 0 4px">${sp==="other"?"Sportarten":"Fokus-Tags"}</div><div class="chips">${tags.map(t=>`<button class="ftag" data-act="tagDel" data-sp="${sp}" data-t="${esc(t)}" title="Entfernen">#${esc(t)} ×</button>`).join("")}<button class="ftag add" data-act="tagAdd" data-sp="${sp}">+ neu</button></div></div>`;}).join("")}</div></details>`;
+  h+=`<details class="fold"><summary>Wochenübersicht</summary><div class="body"><p class="hint" style="margin:0 0 8px">Welche Bereiche die Wochen-Checkliste abfragt.</p><div class="list">${WEEK_CATS.map(c=>`<div class="li"><label class="row grow"><input type="checkbox" data-act="wkCatToggle" data-k="${c.key}" ${S.settings.weekCats[c.key]!==false?"checked":""}> ${c.label}</label></div>`).join("")}</div></div></details>`;
+  h+=`<details class="fold"><summary>Trainingsorte &amp; Material</summary><div class="body"><div class="meta" style="margin-bottom:6px">Material</div>
+    <div class="list">${strMaterials().length?strMaterials().map(m=>`<div class="li"><div class="grow">${esc(m)}</div><button class="x" data-act="matDel" data-m="${esc(m)}" aria-label="Löschen">×</button></div>`).join(""):'<div class="empty" style="padding:10px">Noch kein Material angelegt.</div>'}</div>
+    <button class="btn small ghost" style="margin:6px 0 14px" data-act="matAdd">+ Material</button><div class="meta" style="margin-bottom:6px">Trainingsorte</div>
+    ${strLocations().length?strLocations().map(l=>`<div class="balance"><div class="row"><b class="grow">${esc(l.name)}</b><button class="btn ghost small" data-act="locRename" data-id="${l.id}" aria-label="Umbenennen">✎</button><button class="x" data-act="locDel" data-id="${l.id}" aria-label="Löschen">×</button></div>
+      <div class="chips" style="margin-top:6px">${strMaterials().length?strMaterials().map(m=>`<button class="ftag ${(l.materials||[]).includes(m)?"on":""}" data-act="locMat" data-id="${l.id}" data-m="${esc(m)}">${(l.materials||[]).includes(m)?"✓ ":""}${esc(m)}</button>`).join(""):'<span class="meta">Erst Material anlegen.</span>'}</div></div>`).join(""):'<div class="list"><div class="empty" style="padding:10px">Noch keine Trainingsorte angelegt.</div></div>'}
+    <button class="btn small ghost" style="margin-top:6px" data-act="locAdd">+ Trainingsort</button></div></details>`;
+  h+=`<details class="fold"><summary>Übungs-Katalog · ${S.strExercises.length}</summary><div class="body"><button class="btn block" data-act="strCatalog">Katalog öffnen</button></div></details>`;
+  h+=`<details class="fold"><summary>Datenvertrag der drei Apps</summary><div class="body tblwrap"><table class="contract"><tr><th>Datei</th><th>schreibt</th><th>liest</th></tr>
+    <tr><td><code>${FILE_TRACKING}</code></td><td>Tracking</td><td>Planung (Sessions, Kraft, Griff, Sprung, Gewicht)</td></tr><tr><td><code>${FILE_PLAN}</code></td><td>Planung</td><td>Tracking (Blatt „Ziele“)</td></tr>
+    <tr><td>Polar-Datei (Apps Script)</td><td>Apps Script</td><td>Planung</td></tr><tr><td><code>${FILE_MOBILITY}</code></td><td>Mobility-Baseline</td><td>nur sie selbst</td></tr></table></div></details>`;
+  h+=`<details class="fold"><summary>Prototyp</summary><div class="body stack"><button class="btn block" data-act="demo">Beispieldaten laden</button><button class="btn danger block" data-act="reset">Alle App-Daten löschen</button><p class="hint" style="margin:0">Löscht nur den Speicher in diesem Browser, nicht die Excel im Ordner.</p></div></details>`;
+  return h;}
+
+/* =====================================================================
+   AKTIONEN
+   ===================================================================== */
+const findDel=(arr,id)=>{const i=arr.findIndex(x=>x.id===id);return i<0?null:{i,item:arr.splice(i,1)[0]};};
+function delWithUndo(arr,id,label,after){const r=findDel(arr,id);if(!r)return;persist();render();if(after)after();undoToast(label,()=>{arr.splice(Math.min(r.i,arr.length),0,r.item);persist();render();});}
+function catById(id){return strExById_(id);}
+const ACT={
+  tab:a=>{entryDateDefault=null;UI.tab=a.dataset.v;saveUI();render();window.scrollTo(0,0);},
+  wkCheck:a=>{const wk=addDays(weekKey(today()),7*UI.weekOffset);const k=a.dataset.k;const c=WEEK_CATS.find(x=>x.key===k);const ex=weekCheckOf(wk,k);
+    if(ex)S.weekChecks=S.weekChecks.filter(x=>x!==ex);else S.weekChecks.push({wk,cat:k,note:""});persist();render();
+    if(!ex)toast(c.label+": "+c.none);},
+  wkGo:a=>{const c=WEEK_CATS.find(x=>x.key===a.dataset.k);const cur=weekKey(today());const wk=addDays(cur,7*UI.weekOffset);
+    entryDateDefault=wk===cur?null:addDays(wk,6);Object.assign(UI,c.go);saveUI();render();window.scrollTo(0,0);},
+  wkJump:a=>{UI.weekOffset=+a.dataset.v;saveUI();render();window.scrollTo(0,0);},
+  wkCatToggle:a=>{const k=a.dataset.k;S.settings.weekCats[k]=S.settings.weekCats[k]===false;persist();render();},
+  wkShift:a=>{const v=+a.dataset.v;UI.weekOffset=v===0?0:UI.weekOffset+v;saveUI();render();},
+  quickSave:async()=>{if(LINK.linked()){if(await LINK.saveNow())toast("In die Planungsmappe gespeichert");}else if(dirHandle)await fsSave(false);else exportFile();},
+  closeModal:()=>closeModal(), closeModalRender:()=>{closeModal();render();},
+  bgClose:(a,e)=>{if(e.target===a){closeModal();if(UI.tab==="kraft")render();}},
+  info:a=>openModal(`<h3>Info</h3><p>${esc(INFO[a.dataset.k]||"")}</p><div class="acts"><button class="btn primary" data-act="closeModal">OK</button></div>`),
+  // Sessions
+  sessTab:a=>{UI.sess=a.dataset.v;sessFilterTag=null;saveUI();render();},
+  sessNew:()=>{sessResetForm_();sessShowNew=true;render();},
+  sessClose:()=>{sessShowNew=false;sessResetForm_();render();},
+  sessCancel:()=>{sessResetForm_();sessShowNew=false;render();},
+  sessScale:a=>{const k=a.dataset.k,v=+a.dataset.v;if(k==="int")sessEdInt=sessEdInt===v?null:v;else sessEdVol=sessEdVol===v?null:v;$(k==="int"?"#sessIntRow":"#sessVolRow").innerHTML=sessScaleRow_(k);},
+  sessFocus:a=>{const t=a.dataset.t;const i=sessEdFocus.indexOf(t);if(i>=0)sessEdFocus.splice(i,1);else sessEdFocus.push(t);$("#sessFocusChips").innerHTML=sessFocusChips_(UI.sess);},
+  sessFocusNew:a=>{const sp=a.dataset.sp;const keep={note:$("#sessFocusNote").value,tech:{}};document.querySelectorAll("[id^=sessTech_]").forEach(t=>keep.tech[t.id]=t.value);const d=getDate("f_sdate");
+    inputModal({title:sp==="other"?"Neue Sportart":"Neuer Fokus-Tag",saveLabel:"Anlegen",fields:[{key:"t",label:sp==="other"?"Sportart":"Fokus-Tag",required:true}],onSave:v=>{const t=v.t.trim();if(!t)return;
+      const reg=S.settings.focusTags[sp];const ex=reg.find(x=>x.toLowerCase()===t.toLowerCase());const val=ex||t;if(!ex)reg.push(t);if(!sessEdFocus.includes(val))sessEdFocus.push(val);persist();
+      $("#sessFocusChips").innerHTML=sessFocusChips_(sp);$("#sessFocusNote").value=keep.note;Object.keys(keep.tech).forEach(id=>{const el=document.getElementById(id);if(el)el.value=keep.tech[id];});$("#f_sdate").value=d;}});},
+  sessSave:()=>sessSave(),
+  sessEdit:a=>{const r=S.sessions.find(x=>x.id===a.dataset.id);if(!r)return;sessEditId=r.id;sessEdSport=r.sport;sessEdInt=r.intensity??null;sessEdVol=r.volume??null;sessEdFocus=(r.focusTags||[]).slice();render();window.scrollTo(0,0);},
+  sessDel:a=>{if(sessEditId===a.dataset.id)sessResetForm_();delWithUndo(S.sessions,a.dataset.id,"Session gelöscht");},
+  sessFilter:a=>{sessFilterTag=a.dataset.t||null;render();},
+  // Kraft
+  kraftTab:a=>{UI.kraft=a.dataset.v;saveUI();render();},
+  strAddEx:()=>{draftStr.push(blankEx());renderStrExercises();},
+  strRmEx:a=>{draftStr.splice(+a.dataset.ei,1);renderStrExercises();},
+  strAddSet:a=>{const ex=draftStr[+a.dataset.ei];ex.sets.push(strBlankSet_(ex.loadType||"weighted"));renderStrExercises();},
+  strRmSet:a=>{draftStr[+a.dataset.ei].sets.splice(+a.dataset.si,1);renderStrExercises();},
+  strRir:a=>{const st=draftStr[+a.dataset.ei].sets[+a.dataset.si];const v=+a.dataset.v;st.rir=(+st.rir===v&&st.rir!=null)?null:v;renderStrExercises();},
+  strSave:()=>addStrength(),
+  strCancel:()=>{strEditId=null;draftStr=[blankEx()];draftStrLocation=null;render();},
+  strEdit:a=>strEditWeek(a.dataset.id),
+  strDel:a=>{if(strEditId===a.dataset.id){strEditId=null;draftStr=[blankEx()];}delWithUndo(S.str,a.dataset.id,"Woche gelöscht");},
+  strDet:a=>{const r=$("#strDetail"+a.dataset.i);if(r)r.classList.toggle("hidden");},
+  strCatalog:()=>strOpenCatalog(),
+  strCatAdd:()=>strAddExerciseModal(()=>strOpenCatalog()),
+  catMat:a=>{const e=catById(a.dataset.id);e.materials=Array.isArray(e.materials)?e.materials:[];const i=e.materials.indexOf(a.dataset.m);if(i>=0)e.materials.splice(i,1);else e.materials.push(a.dataset.m);persist();strRenderCatalogList_();},
+  catUni:a=>{const e=catById(a.dataset.id);e.unilateral=!e.unilateral;persist();strRenderCatalogList_();},
+  catFocus:a=>{const e=catById(a.dataset.id);e.focus=!e.focus;persist();strRenderCatalogList_();},
+  catType:a=>{const e=catById(a.dataset.id);const o=["weighted","bodyweight","hold"];e.loadType=o[(o.indexOf(e.loadType||"weighted")+1)%3];if(e.loadType!=="weighted"&&e.bwCoeff==null)e.bwCoeff=strBwCoeffDefault_(e.name);persist();strRenderCatalogList_();},
+  catCoeff:a=>{const e=catById(a.dataset.id);inputModal({title:"KG-Faktor",fields:[{key:"c",label:"Anteil des Körpergewichts in %",type:"number",value:Math.round((e.bwCoeff!=null?e.bwCoeff:0.65)*100),required:true}],
+    onSave:v=>{const c=parseFloat(v.c);if(!(isFinite(c)&&c>0)){toast("Ungültiger Wert");return;}e.bwCoeff=Math.max(0.05,Math.min(2,c/100));persist();strOpenCatalog();toast("Faktor gespeichert");}});},
+  catTest:a=>{const e=catById(a.dataset.id);inputModal({title:"Getestetes 1RM",fields:[{key:"kg",label:"1RM in kg",type:"number",required:true},{key:"date",label:"Datum",type:"date",value:today(),required:true}],
+    onSave:v=>{const kg=+v.kg;if(!(kg>0)){toast("Ungültige kg");return;}e.tested=e.tested||[];e.tested.push({date:v.date||today(),kg});e.tested.sort((x,y)=>x.date<y.date?1:-1);persist();strOpenCatalog();toast("1RM gespeichert");}});},
+  catDelTest:a=>{const e=catById(a.dataset.id);e.tested.splice(+a.dataset.ti,1);persist();strRenderCatalogList_();},
+  catCat:a=>{const e=catById(a.dataset.id);const o=STR_CATS.map(c=>c[0]);e.category=o[(o.indexOf(e.category||"other")+1)%o.length];persist();strRenderCatalogList_();},
+  catRename:a=>{const e=catById(a.dataset.id);inputModal({title:"Übung umbenennen",fields:[{key:"n",label:"Name",value:e.name,required:true}],onSave:v=>{e.name=v.n.trim();persist();strOpenCatalog();}});},
+  catDel:a=>{const arr=S.strExercises;const i=arr.findIndex(x=>x.id===a.dataset.id);if(i<0)return;const it=arr.splice(i,1)[0];persist();strRenderCatalogList_();undoToast("Übung gelöscht",()=>{arr.splice(Math.min(i,arr.length),0,it);persist();strRenderCatalogList_();});},
+  // Kraftmessung
+  gtPresetUse:a=>{const p=gtPresets().find(x=>x.id===a.dataset.id);if(!p)return;const date=gtDraft?getDate("gt_date"):today();
+    gtDraft={kind:p.kind==="test"?"test":"train",date,program:p.program||"",hand:p.hand||"both",lat:p.lat||"bi",sets:p.sets,reps:p.reps,sec:p.sec,restRep:p.restRep,restSet:p.restSet,load:p.load,peak:null,note:p.note||"",_preset:p.id};UI.gtKind=gtDraft.kind;saveUI();render();toast("Preset „"+p.name+"“ geladen");},
+  gtPresetNew:()=>{gtReadForm();const d=gtDraft;inputModal({title:"Als Preset speichern",saveLabel:"Speichern",fields:[{key:"n",label:"Name",value:[d.program,d.sets&&d.reps&&d.sec?`${d.sets}×${d.reps}×${d.sec}s`:""].filter(Boolean).join(" "),required:true}],
+    onSave:v=>{const name=v.n.trim();const P=gtPresets();const ex=P.find(p=>p.name.toLowerCase()===name.toLowerCase());
+      const rec={name,kind:gtKind(d),program:d.program,hand:d.hand,lat:gtLat(d),sets:d.sets,reps:d.reps,sec:d.sec,restRep:d.restRep,restSet:d.restSet,load:d.load,note:d.note};
+      if(ex){if(!confirm(`Preset „${ex.name}“ gibt es schon. Überschreiben?`))return;Object.assign(ex,rec);}else P.push(Object.assign({id:uid("gp")},rec));
+      persist();render();toast("Preset gespeichert");}});},
+  gtPresetEdit:()=>{gtReadForm();gtPresetEdit=!gtPresetEdit;render();},
+  gtPresetDel:a=>{const P=gtPresets();const i=P.findIndex(p=>p.id===a.dataset.id);if(i<0)return;const it=P.splice(i,1)[0];persist();render();undoToast("Preset gelöscht",()=>{P.splice(i,0,it);persist();render();});},
+  gtPresetRename:a=>{const p=gtPresets().find(x=>x.id===a.dataset.id);if(!p)return;inputModal({title:"Preset umbenennen",fields:[{key:"n",label:"Name",value:p.name,required:true}],onSave:v=>{p.name=v.n.trim();persist();render();}});},
+  gtPresetUpdate:a=>{gtReadForm();const p=gtPresets().find(x=>x.id===a.dataset.id);if(!p)return;const d=gtDraft;
+    if(!confirm(`„${p.name}“ mit den aktuellen Formularwerten überschreiben?\n${[d.program,d.sets&&d.reps&&d.sec?`${d.sets}×${d.reps}×${d.sec}s`:"",d.load!=null?d.load+" kg":""].filter(Boolean).join(" · ")}`))return;
+    Object.assign(p,{kind:gtKind(d),program:d.program,hand:d.hand,lat:gtLat(d),sets:d.sets,reps:d.reps,sec:d.sec,restRep:d.restRep,restSet:d.restSet,load:d.load,note:d.note});persist();render();toast("Preset aktualisiert");},
+  gtPresetMove:a=>{const P=gtPresets();const i=+a.dataset.i,j=i+(+a.dataset.d);if(j<0||j>=P.length)return;[P[i],P[j]]=[P[j],P[i]];persist();render();},
+  gtKind:a=>{gtReadForm();const k=a.dataset.v;if(gtKind(gtDraft)===k)return;UI.gtKind=k;saveUI();gtDraft=gtBlank(k);render();},
+  gtLat:a=>{gtReadForm();gtDraft.lat=a.dataset.v;render();},
+  gtTimer:()=>{gtReadForm();gtTimerStart(gtDraft);},
+  gtTStop:()=>{if(confirm("Timer beenden?"))gtTimerStop();},
+  gtTPause:()=>{if(!gtT)return;if(gtT.paused){gtT.paused=false;gtT.endAt=Date.now()+gtT.remain*1000;}else{gtT.remain=Math.max(0,(gtT.endAt-Date.now())/1000);gtT.paused=true;}gtTimerRender();},
+  gtTSkip:()=>{if(gtT)gtNext();},
+  gtHand:a=>{gtReadForm();gtDraft.hand=a.dataset.v;render();},
+  gtSave:()=>{gtReadForm();const d=gtDraft;if(!d.sets&&!d.load&&!d.peak){toast("Mindestens Sätze oder Last eintragen");return;}
+    S.gripTrain=S.gripTrain||[];const rec=Object.assign({},d,{source:"manual",id:gtEditId||uid("gt"),tut:null,vol:null});delete rec._preset;
+    if(gtEditId){const i=S.gripTrain.findIndex(g=>g.id===gtEditId);S.gripTrain[i]=rec;}else S.gripTrain.push(rec);
+    gtEditId=null;gtDraft=null;persist();render();toast("Griffkraft-Training gespeichert");},
+  gtEdit:a=>{gtEditId=a.dataset.id;gtDraft=null;render();window.scrollTo(0,0);},
+  gtCancel:()=>{gtEditId=null;gtDraft=null;render();},
+  gtDel:a=>{if(gtEditId===a.dataset.id){gtEditId=null;gtDraft=null;}delWithUndo(S.gripTrain,a.dataset.id,"Einheit gelöscht");},
+  pickGripSensor:()=>$("#fileGrip").click(),
+  measPhase:a=>{measPhase=a.dataset.v;$("#measPhaseBtns").innerHTML=measPhaseBtns_();},
+  measSave:()=>addMeasure(),
+  measEdit:a=>{measEditId=a.dataset.id;measPhase="";render();window.scrollTo(0,0);},
+  measCancel:()=>{measEditId=null;measPhase="";render();},
+  measDel:a=>delWithUndo(S.measures,a.dataset.id,"Messung gelöscht"),
+  pickJump:()=>$("#fileJump").click(),
+  jumpDet:a=>{const r=$("#jumpDet"+a.dataset.i);if(r)r.classList.toggle("hidden");},
+  jumpDel:a=>delWithUndo(S.jumps,a.dataset.id,"Sprung-Session gelöscht"),
+  // Gewicht
+  wCond:a=>{const k=a.dataset.k,v=a.dataset.v==="1";weightCond[k]=weightCond[k]===v?null:v;$("#wt_cond").innerHTML=weightCondHtml_();},
+  weightSave:()=>addWeight(),
+  weightDel:a=>delWithUndo(S.weight,a.dataset.id,"Messung gelöscht"),
+  // Einstellungen
+  refAdd:a=>{const sp=a.dataset.sp;inputModal({title:"Neue Frage",saveLabel:"Anlegen",fields:[{key:"q",label:"Frage",required:true}],onSave:v=>{S.settings.reflection[sp].push({id:uid("q"),q:v.q.trim()});persist();render();}});},
+  refRename:a=>{const it=sessReflectionSet_(a.dataset.sp).find(x=>x.id===a.dataset.id);inputModal({title:"Frage bearbeiten",fields:[{key:"q",label:"Frage",value:it.q,required:true}],onSave:v=>{it.q=v.q.trim();persist();render();}});},
+  refDel:a=>delWithUndo(S.settings.reflection[a.dataset.sp],a.dataset.id,"Frage gelöscht"),
+  refMove:a=>{const set=S.settings.reflection[a.dataset.sp];const i=set.findIndex(x=>x.id===a.dataset.id),j=i+(+a.dataset.d);if(j<0||j>=set.length)return;[set[i],set[j]]=[set[j],set[i]];persist();render();},
+  tagAdd:a=>{const sp=a.dataset.sp;inputModal({title:sp==="other"?"Neue Sportart":"Neuer Fokus-Tag",saveLabel:"Anlegen",fields:[{key:"t",label:sp==="other"?"Sportart":"Fokus-Tag",required:true}],onSave:v=>{const t=v.t.trim();const reg=S.settings.focusTags[sp];if(!reg.some(x=>x.toLowerCase()===t.toLowerCase()))reg.push(t);persist();render();}});},
+  tagDel:a=>{S.settings.focusTags[a.dataset.sp]=sessFocusReg_(a.dataset.sp).filter(x=>x!==a.dataset.t);persist();render();},
+  matAdd:()=>inputModal({title:"Material",saveLabel:"Anlegen",fields:[{key:"n",label:"Bezeichnung (z.B. Langhantel, Klimmzugstange, Kabelzug)",required:true}],onSave:v=>{const n=v.n.trim();if(!S.strMaterials.some(x=>x.toLowerCase()===n.toLowerCase()))S.strMaterials.push(n);persist();render();}}),
+  matDel:a=>{const m=a.dataset.m;const i=S.strMaterials.indexOf(m);if(i<0)return;S.strMaterials.splice(i,1);const locs=S.strLocations.filter(l=>(l.materials||[]).includes(m)),exs=S.strExercises.filter(e=>(e.materials||[]).includes(m));
+    locs.forEach(l=>l.materials=l.materials.filter(x=>x!==m));exs.forEach(e=>e.materials=e.materials.filter(x=>x!==m));persist();render();
+    undoToast("Material gelöscht",()=>{S.strMaterials.splice(i,0,m);locs.forEach(l=>l.materials.push(m));exs.forEach(e=>e.materials.push(m));persist();render();});},
+  locAdd:()=>inputModal({title:"Trainingsort",saveLabel:"Anlegen",fields:[{key:"n",label:"Name (z.B. Homegym, Studio, Reise/Hotel)",required:true}],onSave:v=>{S.strLocations.push({id:uid("loc"),name:v.n.trim(),materials:[]});persist();render();}}),
+  locRename:a=>{const l=strLocationById_(a.dataset.id);inputModal({title:"Ort umbenennen",fields:[{key:"n",label:"Name",value:l.name,required:true}],onSave:v=>{l.name=v.n.trim();persist();render();}});},
+  locDel:a=>{if(draftStrLocation===a.dataset.id)draftStrLocation=null;delWithUndo(S.strLocations,a.dataset.id,"Trainingsort gelöscht");},
+  locMat:a=>{const l=strLocationById_(a.dataset.id);l.materials=l.materials||[];const i=l.materials.indexOf(a.dataset.m);if(i>=0)l.materials.splice(i,1);else l.materials.push(a.dataset.m);persist();render();},
+  // Datei
+  fsConnect:()=>fsConnect(), fsLoad:()=>fsLoadAll(), fsSave:()=>fsSave(false), export:()=>exportFile(),
+  pickTracking:()=>$("#fileTracking").click(), pickPlan:()=>$("#filePlan").click(),
+  demo:()=>{if((S.sessions.length+S.str.length)&&!confirm("Beispieldaten ersetzen deine App-Daten. Weiter?"))return;loadDemo();render();},
+  reset:()=>{if(!confirm("Alle App-Daten in diesem Browser löschen?"))return;S=emptyState();GOALS=null;[LS_STATE,LS_GOALS].forEach(k=>localStorage.removeItem(k));draftStr=[blankEx()];render();}
+};
+document.addEventListener("click",e=>{const a=e.target.closest("[data-act]");if(!a)return;const f=ACT[a.dataset.act];if(f)f(a,e);});
+document.addEventListener("input",e=>{const t=e.target;
+  if(t.matches("[data-kw]")){const b=document.getElementById(t.id+"_kw");if(b&&t.value)b.textContent=kwLabel(t.value);if(t.id==="f_date")renderStrExercises();return;}
+  if(t.dataset.str){const [ei,si,f]=t.dataset.str.split("|");const ex=draftStr[+ei];ex.sets[+si][f]=t.value;const eff=document.getElementById(`eff${ei}_${si}`);if(eff){const bw=bwForDate_(getDate("f_date"));eff.textContent="≈ "+(bw!=null?Math.round(strEffLoad_(ex,ex.sets[+si],bw))+" kg":"–");}return;}
+  if(t.dataset.note){const [wk,area,dim]=t.dataset.note.split("|");setNote(wk,area,dim,t.value);t.style.height="auto";t.style.height=t.scrollHeight+"px";
+    const pe=document.getElementById(`np_${area}_${dim}`);if(pe)pe.classList.toggle("hidden",!noteOf(wk,area,dim));return;}
+  if(t.dataset&&t.dataset.gt){gtReadForm();const c=gtCalc(gtDraft);const ts=document.querySelector(".gttimerbtn span");if(ts)ts.textContent=gtTimerSummary(gtDraft);const el=$("#gt_calc");if(el)el.innerHTML=`TUT <b>${c.tut!=null?Math.round(c.tut)+" s":"–"}</b> · Volumen <b>${c.vol!=null?Math.round(c.vol).toLocaleString("de-CH")+" kg·s":"–"}</b>`;return;}
+  if(t.id==="m_gl"||t.id==="m_gr"){const v=lsi($("#m_gl").value,$("#m_gr").value);const el=$("#m_lsi");el.textContent=v!=null?v+" %":"";el.className="pillb "+band(v);}});
+document.addEventListener("change",e=>{const t=e.target;
+  if(t.dataset.strpick!=null){strPickExercise(+t.dataset.strpick,t.value);return;}
+  if(t.id==="f_loc"){draftStrLocation=t.value||null;renderStrExercises();return;}
+  if(t.id==="autoSave"){UI.autoSave=t.checked;saveUI();if(t.checked&&S.meta.dirty)fsSave(false);return;}
+  if(t.id==="fileTracking"&&t.files[0]){importTrackingFile(t.files[0]);t.value="";}
+  if(t.id==="filePlan"&&t.files[0]){importPlanFile(t.files[0]);t.value="";}
+  if(t.id==="fileJump"&&t.files.length){importJumpFiles([...t.files]);t.value="";}
+  if(t.id==="fileGrip"&&t.files[0]){const f=t.files[0];t.value="";(async()=>{try{let list;if(/\.json$/i.test(f.name))list=gripSensorSessions(JSON.parse(await f.text()));else list=gripSensorFromWb(await readFileWb(f));
+      if(!list.length){toast("Keine Griffkraft-Einheiten gefunden");return;}const r=mergeGrip(list);persist();render();toast(`${r.added} neu, ${r.upd} aktualisiert`);}catch(e){toast(e.message||"Datei nicht lesbar");}})();}});
+
+/* =====================================================================
+   BEISPIELDATEN (Prototyp)
+   ===================================================================== */
+function loadDemo(){
+  const N=emptyState();const t=today();
+  N.settings.reflection.climb=[{id:"q1",q:"Was hat technisch funktioniert?"},{id:"q2",q:"Wo bin ich rausgefallen — warum?"}];
+  N.settings.reflection.kick=[{id:"q3",q:"Deckung unter Ermüdung gehalten?"}];N.settings.focusTags.climb=["überhang","fusstechnik"];N.settings.focusTags.other=["Laufen","Schwimmen"];
+  N.strMaterials=["Langhantel","Klimmzugstange","Hangboard"];N.strLocations=[{id:"l1",name:"Homegym",materials:["Klimmzugstange","Hangboard"]},{id:"l2",name:"Studio",materials:["Langhantel","Klimmzugstange"]}];
+  const ex=[["Kreuzheben","hinge","weighted",null,false,["Langhantel"],true],["Kniebeuge","squat","weighted",null,false,["Langhantel"],false],["Klimmzug","pull","bodyweight",1.0,false,["Klimmzugstange"],true],["Liegestütz","push","bodyweight",0.64,false,[],false],["Hang 20 mm","grip","hold",1.0,false,["Hangboard"],false],["Bulgarian Split Squat","squat","weighted",null,true,[],false]];
+  ex.forEach(([name,category,loadType,bwCoeff,unilateral,materials,focus],i)=>{const e={id:"sx"+i,name,category,loadType,unilateral,materials,tested:[],focus};if(bwCoeff!=null)e.bwCoeff=bwCoeff;N.strExercises.push(e);});
+  N.strExercises[0].tested=[{date:addDays(t,-60),kg:140}];
+  for(let i=27;i>=0;i--){const d=addDays(t,-i);
+    N.weight.push({id:uid("w"),date:d,kg:+(72.4+Math.sin(i/4)*0.6).toFixed(1),cond:{fasted:i%5!==0,toilet:true,clothed:i%5===0},note:""});
+    if(i%3===0)N.sessions.push({id:uid("ss"),date:d,sport:"climb",intensity:3+(i%2),volume:3,technique:[{qid:"q1",q:"Was hat technisch funktioniert?",a:"Hüfte nah an der Wand"}],focusTags:["überhang"],focusNote:""});
+    if(i%4===1)N.sessions.push({id:uid("ss"),date:d,sport:"kick",intensity:4,volume:3,technique:[],focusTags:[],focusNote:"Sparring"});
+    if(i%9===5)N.sessions.push({id:uid("ss"),date:d,sport:"other",intensity:2,volume:4,technique:[],focusTags:["Laufen"],focusNote:""});
+    if(i%7===2){const k=Math.floor(i/7);N.str.push({id:uid("sw"),date:d,bw:72.4,locationId:"l2",location:"Studio",n:2,note:"",exercises:[
+      {exerciseId:"sx0",name:"Kreuzheben",category:"hinge",unilateral:false,loadType:"weighted",sets:[{reps:5,kg:110-k*2.5,rir:3},{reps:5,kg:115-k*2.5,rir:3},{reps:3,kg:122.5-k*2.5,rir:1}]},
+      {exerciseId:"sx2",name:"Klimmzug",category:"pull",unilateral:false,loadType:"bodyweight",bwCoeff:1,sets:[{reps:6,addedKg:0,rir:3},{reps:5,addedKg:5,rir:1}]},
+      {exerciseId:"sx4",name:"Hang 20 mm",category:"grip",unilateral:false,loadType:"hold",bwCoeff:1,sets:[{sec:10,addedKg:5,rir:null},{sec:10,addedKg:5,rir:null}]}]});}
+    if(i%7===4){N.measures.push({id:uid("m"),date:d,phase:"vor Training",gl:46+(i%3),gr:50,note:""});
+      ["left","right"].forEach(leg=>N.jumps.push({id:uid("j"),date:d,time:"18:10",leg,drill:"CMJ",weight_kg:null,reps:3,best:leg==="left"?21.5+(i%3)*0.4:23.4,mean:21,rsi:leg==="left"?1.1:1.25,rsi_mean:1.0,mean_power_w:leg==="left"?880:940,peak_power_w:leg==="left"?2050:2160,ttpv_ms:leg==="left"?260:240,ttpv_mean_ms:270,squat_mm:300,source:"demo"}));}}
+  [N.sessions,N.str,N.measures,N.weight].forEach(sortDesc);S=N;S.meta.dirty=true;persist();toast("Beispieldaten geladen");}
+
+/* START */
+/* =====================================================================
+   VERBUNDENE DATEIEN — gemeinsame Planungsmappe + Eingangsdateien
+   ---------------------------------------------------------------------
+   • Android-APK: native Erweiterung „LinkedFile“ (dauerhafte Datei-Erlaubnis,
+     auch für Dateien in Google Drive) — wird von setup_apps.py eingebaut.
+   • Computer (Chrome/Edge): Datei-Handles der File System Access API.
+   Jede App schreibt nur IHRE Blätter in die Mappe und lässt die anderen stehen.
+   Änderungen in Excel werden über einen Fingerabdruck der eigenen Blätter erkannt.
+   ===================================================================== */
+var LINK = (function(){
+  let APP = null, links = {}, H = {}, busy = false, ready = false, saveTimer = null, pending = false;
+  const XTYPE = { description:"Excel", accept:{ "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":[".xlsx"] } };
+  const LS = () => "linkedfiles." + APP.key;
+  const capNative = () => { const C = window.Capacitor; return !!(C && C.isNativePlatform && C.isNativePlatform()); };
+  const isNative = () => capNative() && !!(window.Capacitor.Plugins && window.Capacitor.Plugins.LinkedFile);
+  const isFSA = () => !capNative() && ("showOpenFilePicker" in window) && !/Android|iPhone|iPad/i.test(navigator.userAgent);
+  const available = () => isNative() || isFSA();
+  const P = () => window.Capacitor.Plugins.LinkedFile;
+  const clean = l => { const o = {}; Object.keys(l).forEach(k => { if(k[0] !== "_") o[k] = l[k]; }); return o; };
+  function load(){ try{ links = JSON.parse(localStorage.getItem(LS())) || {}; }catch(e){ links = {}; } }
+  function store(){ try{ const o = {}; Object.keys(links).forEach(k => o[k] = clean(links[k])); localStorage.setItem(LS(), JSON.stringify(o)); }catch(e){} }
+  function idb(mode, fn){ return new Promise((res, rej) => { const o = indexedDB.open("linked-files", 1);
+    o.onupgradeneeded = () => o.result.createObjectStore("h");
+    o.onsuccess = () => { const db = o.result, tx = db.transaction("h", mode), r = fn(tx.objectStore("h")); tx.oncomplete = () => { db.close(); res(r && r.result); }; tx.onerror = () => { db.close(); rej(tx.error); }; };
+    o.onerror = () => rej(o.error); }); }
+  function b64ToBytes(b){ const s = atob(b || ""); const a = new Uint8Array(s.length); for(let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+  function bytesToB64(bytes){ const a = new Uint8Array(bytes); let s = ""; for(let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000)); return btoa(s); }
+  async function handle(l){ if(!H[l.handleKey]) H[l.handleKey] = await idb("readonly", st => st.get(l.handleKey)); return H[l.handleKey]; }
+
+  /* ---- Datei auswählen / anlegen ---- */
+  async function pick(slot, create){
+    const cfg = APP.slots.find(s => s.id === slot);
+    if(isNative()){
+      const r = create ? await P().create({ name: cfg.suggest || "planungsmappe.xlsx", write: true }) : await P().pick({ write: !!cfg.write });
+      if(cfg.write && r.writable === false) throw new Error("Diese Datei erlaubt der App kein Schreiben. Wähle eine andere Datei oder lege eine neue an.");
+      links[slot] = { backend:"native", uri:r.uri, name:r.name || "Datei" };
+    } else {
+      let h;
+      if(create) h = await window.showSaveFilePicker({ suggestedName: cfg.suggest || "planungsmappe.xlsx", types:[XTYPE] });
+      else [h] = await window.showOpenFilePicker({ multiple:false, types: cfg.write ? [XTYPE] : undefined });
+      const key = APP.key + ":" + slot; await idb("readwrite", st => st.put(h, key)); H[key] = h;
+      links[slot] = { backend:"fsa", handleKey:key, name:h.name };
+      if(!(await perm(links[slot], !!cfg.write, true))) throw new Error("Zugriff nicht erlaubt");
+    }
+    store();
+  }
+  async function perm(l, write, interactive){
+    if(l.backend === "native") return isNative();
+    const h = await handle(l); if(!h) return false; const o = { mode: write ? "readwrite" : "read" };
+    if((await h.queryPermission(o)) === "granted") return true;
+    if(!interactive) return false;
+    return (await h.requestPermission(o)) === "granted";
+  }
+  async function read(l){
+    if(l.backend === "native"){ const r = await P().read({ uri:l.uri }); if(r.name) l.name = r.name; return { bytes:b64ToBytes(r.data), name:r.name || l.name, lastModified:r.lastModified || 0 }; }
+    const f = await (await handle(l)).getFile(); return { bytes:new Uint8Array(await f.arrayBuffer()), name:f.name, lastModified:f.lastModified };
+  }
+  async function write(l, bytes){
+    if(l.backend === "native"){ await P().write({ uri:l.uri, data:bytesToB64(bytes) }); return; }
+    const w = await (await handle(l)).createWritable(); await w.write(new Blob([bytes])); await w.close();
+  }
+  function toWb(bytes, name){
+    if(!bytes || !bytes.length) return null;
+    if(/\.json$/i.test(name || "")){ const t = new TextDecoder().decode(bytes); return { SheetNames:[], Sheets:{}, __json: JSON.parse(t) }; }
+    if(/\.(csv|txt)$/i.test(name || "")) return XLSX.read(new TextDecoder().decode(bytes), { type:"string", cellDates:true });
+    return XLSX.read(bytes, { type:"array", cellDates:true, cellStyles:true });
+  }
+  /* Fingerabdruck von Blättern: nur Werte (keine Formate, keine Formeln) */
+  function hash(wb, names){
+    let h = 2166136261 >>> 0; const add = s => { for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } };
+    names.filter(n => wb.Sheets[n]).sort().forEach(n => { add("§" + n); const ws = wb.Sheets[n];
+      Object.keys(ws).filter(k => k[0] !== "!").sort().forEach(k => { const c = ws[k]; if(!c || c.f) return; let v = c.v; if(v == null || v === "") return;
+        if(v instanceof Date) v = v.toISOString().slice(0, 10); else if(typeof v === "number") v = +v.toPrecision(12); add(k + "=" + String(v) + ";"); }); });
+    return h.toString(36);
+  }
+  /* Welche Apps haben schon in diese Mappe geschrieben? (Erkennung an typischen Blättern) */
+  function appsIn(wb){ const s = wb ? wb.SheetNames : []; const a = [];
+    if(s.includes("Ziele") || s.includes("Gesamt")) a.push("planung");
+    if(s.includes("Tracking-Info") || s.includes("Kraft-Einträge")) a.push("tracking");
+    if(s.includes("Mobility-Übungen")) a.push("mobility");
+    return a; }
+  const ownIn = wb => APP.ownSheets().filter(n => wb.Sheets[n]);
+  const othersIn = wb => wb.SheetNames.filter(n => !APP.ownSheets().includes(n));
+  function merge(existing, own){
+    const out = XLSX.utils.book_new(); const drop = new Set(APP.ownSheets().concat(own.SheetNames));
+    const others = existing ? existing.SheetNames.filter(n => !drop.has(n)) : [];
+    const addOwn = () => own.SheetNames.forEach(n => XLSX.utils.book_append_sheet(out, own.Sheets[n], n));
+    const addOthers = () => others.forEach(n => XLSX.utils.book_append_sheet(out, existing.Sheets[n], n));
+    if(APP.ownFirst){ addOwn(); addOthers(); } else { addOthers(); addOwn(); }
+    return out;
+  }
+
+  /* ---- In die Mappe schreiben (eigene Blätter ersetzen, fremde behalten) ---- */
+  async function doSave(force){
+    const m = links.mappe; if(!m) return false;
+    if(!(await perm(m, true, false))){ m.needPerm = true; store(); refresh(); return false; }
+    let f; try{ f = await read(m); }catch(e){ f = { bytes:new Uint8Array(0), name:m.name }; }
+    const wb = toWb(f.bytes, f.name);
+    if(wb && !force && m.lastHash){
+      const own = ownIn(wb);
+      if(own.length){ const h = hash(wb, own);
+        if(h !== m.lastHash){
+          if(confirm(`Die Daten dieser App wurden in „${m.name}“ inzwischen geändert (z. B. in Excel).\n\nOK = Excel-Stand in die App laden (deine letzten App-Änderungen gehen verloren)\nAbbrechen = App-Stand schreiben (überschreibt die Excel-Änderungen)`)){
+            APP.importOwn(wb); m.lastHash = h; store(); if(APP.afterChange) APP.afterChange(); toast("Excel-Stand geladen"); return false;
+          }
+        }
+      }
+    }
+    const ownWb = APP.buildOwn(); const merged = merge(wb, ownWb);
+    await write(m, new Uint8Array(XLSX.write(merged, { bookType:"xlsx", type:"array" })));
+    m.lastHash = hash(merged, ownWb.SheetNames); m.apps = appsIn(merged); m.lastSave = Date.now(); m.error = null; m.needPerm = false; store();
+    if(APP.markClean) APP.markClean(); refresh(); return true;
+  }
+  function changed(){ pending = true; if(!links.mappe) return; schedule(); }
+  function schedule(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      if(!ready || busy){ schedule(); return; }
+      pending = false; busy = true;
+      try{ await doSave(false); }
+      catch(e){ if(links.mappe){ links.mappe.error = e.message || String(e); store(); } toast("Speichern in die Mappe fehlgeschlagen: " + (e.message || e)); }
+      finally{ busy = false; refresh(); }
+    }, APP.saveDelay || 2000);
+  }
+
+  /* ---- Abgleich: Mappe lesen (fremde Daten übernehmen, eigene Excel-Änderungen erkennen), Eingänge lesen ---- */
+  async function sync(interactive){
+    if(busy) return; busy = true; const msgs = []; let touched = false;
+    try{
+      const m = links.mappe;
+      if(m){
+        if(!(await perm(m, false, interactive))) m.needPerm = true;
+        else {
+          m.needPerm = false;
+          const f = await read(m); const wb = toWb(f.bytes, f.name); m.apps = appsIn(wb);
+          if(!wb){ busy = false; await doSave(true); busy = true; msgs.push("Mappe angelegt"); }
+          else {
+            const oh = hash(wb, APP.readsSheets ? APP.readsSheets().filter(n => wb.Sheets[n]) : othersIn(wb));
+            if(oh !== m.othersHash){ try{ const r = APP.consume(wb); if(r){ msgs.push(r); } touched = true; }catch(e){ console.warn(e); } m.othersHash = oh; }
+            const own = ownIn(wb);
+            if(!own.length){ busy = false; await doSave(true); busy = true; msgs.push("App-Daten in die Mappe geschrieben"); }
+            else {
+              const h = hash(wb, own);
+              if(h !== m.lastHash){
+                const first = !m.lastHash;
+                if(!first && !APP.isDirty()){ APP.importOwn(wb); m.lastHash = h; touched = true; msgs.push("Excel-Änderungen übernommen"); }
+                else {
+                  const q = first
+                    ? `„${m.name}“ enthält schon Daten dieser App.\n\nOK = diese Daten in die App laden\nAbbrechen = den App-Stand in die Datei schreiben`
+                    : `Die Daten dieser App wurden in „${m.name}“ geändert (z. B. in Excel), und in der App gibt es ungespeicherte Änderungen.\n\nOK = Excel-Stand laden (App-Änderungen verwerfen)\nAbbrechen = App-Stand in die Datei schreiben`;
+                  if(confirm(q)){ APP.importOwn(wb); m.lastHash = h; touched = true; msgs.push("Daten aus der Mappe geladen"); }
+                  else { busy = false; await doSave(true); busy = true; msgs.push("App-Stand in die Mappe geschrieben"); }
+                }
+              }
+            }
+          }
+          m.lastSync = Date.now(); m.error = null;
+        }
+      }
+      for(const s of APP.slots.filter(s => !s.write)){
+        const l = links[s.id]; if(!l) continue;
+        if(!(await perm(l, false, interactive))){ l.needPerm = true; continue; }
+        l.needPerm = false;
+        try{
+          const f = await read(l); const key = (f.lastModified || 0) + ":" + f.bytes.length;
+          if(key !== l.stamp){ const wb = toWb(f.bytes, f.name); if(wb){ const r = APP.consumeInput(s.id, wb, f.name); if(r) msgs.push(r); touched = true; } l.stamp = key; }
+          l.lastSync = Date.now(); l.error = null;
+        }catch(e){ l.error = e.message || String(e); }
+      }
+    }catch(e){ if(links.mappe) links.mappe.error = e.message || String(e); msgs.push("Abgleich fehlgeschlagen: " + (e.message || e)); }
+    finally{
+      busy = false; ready = true; store();
+      if(touched && APP.afterChange) APP.afterChange();
+      refresh(); if(msgs.length) toast(msgs.join(" · "));
+      if(pending && links.mappe) schedule();
+    }
+  }
+
+  /* ---- Oberfläche ---- */
+  function fmtTime(t){ if(!t) return ""; const d = new Date(t); const same = d.toDateString() === new Date().toDateString(); return (same ? "" : d.toLocaleDateString("de-CH") + " ") + d.toLocaleTimeString("de-CH", { hour:"2-digit", minute:"2-digit" }); }
+  function statusOf(l){
+    if(!l) return "nicht verbunden";
+    if(l.needPerm) return "Zugriff muss erneuert werden";
+    if(l.error) return "Fehler: " + l.error;
+    return l.lastSave && (!l.lastSync || l.lastSave > l.lastSync) ? "gespeichert " + fmtTime(l.lastSave) : l.lastSync ? "abgeglichen " + fmtTime(l.lastSync) : "verbunden";
+  }
+  function sectionHtml(){
+    if(!APP) return "";
+    const U = APP.ui || {};
+    if(!available()){
+      if(capNative()) return `<p class="${U.hint || ""}" style="margin:0">Diese APK hat die Datei-Erweiterung noch nicht. Am Computer <code>python setup_apps.py --update</code> ausführen, die APK neu bauen und installieren — dann kannst du Dateien hier dauerhaft verbinden.</p>`;
+      return `<p class="${U.hint || ""}" style="margin:0">Dateien dauerhaft verbinden geht in der Android-App und in Chrome/Edge am Computer.</p>`;
+    }
+    const anyPerm = APP.slots.some(s => links[s.id] && links[s.id].needPerm);
+    return `<div class="lnk-box">
+      ${APP.slots.map(s => { const l = links[s.id]; return `<div class="lnk-row">
+        <div class="lnk-main"><div class="lnk-lab">${s.label}${s.write ? "" : ' <span class="lnk-ro">nur lesen</span>'}</div>
+          <div class="lnk-file">${l ? escL(l.name) : "—"}</div><div class="lnk-st ${l && (l.error || l.needPerm) ? "lnk-warn" : ""}">${escL(statusOf(l))}</div>
+          ${s.write && l && l.apps ? `<div class="lnk-apps">${[["planung","Planung"],["tracking","Tracking"],["mobility","Mobility"]].map(([k,t]) => `<span class="${l.apps.includes(k) ? "on" : ""}">${l.apps.includes(k) ? "✓" : "–"} ${t}</span>`).join("")}</div>
+            ${l.apps.length < 3 ? `<div class="lnk-help">Noch nicht alle Apps schreiben in diese Mappe. Öffne die fehlenden Apps und verbinde dort unter „Verbundene Dateien ▸ Planungsmappe ▸ Verbinden“ genau diese Datei (${escL(l.name)}).</div>` : `<div class="lnk-help">Alle drei Apps synchronisieren über diese Mappe.</div>`}` : ""}
+          ${s.help && !(s.write && l) ? `<div class="lnk-help">${s.help}</div>` : ""}</div>
+        <div class="lnk-btns">
+          <button class="${U.btn || ""}" data-lnk="pick|${s.id}">${l ? "Ändern" : "Verbinden"}</button>
+          ${s.write && !l ? `<button class="${U.btn || ""}" data-lnk="create|${s.id}">Neu anlegen</button>` : ""}
+          ${l ? `<button class="${U.btn || ""}" data-lnk="unlink|${s.id}" aria-label="Verbindung trennen">Trennen</button>` : ""}
+        </div></div>`; }).join("")}
+      ${APP.slots.some(s => links[s.id]) ? `<div class="lnk-actions"><button class="${U.primary || ""}" data-lnk="sync">${anyPerm ? "Zugriff erneuern & abgleichen" : "Jetzt abgleichen"}</button>${links.mappe ? `<button class="${U.btn || ""}" data-lnk="save">In Mappe speichern</button>` : ""}</div>` : ""}
+      <p class="lnk-help" style="margin:8px 0 0">Die Planungsmappe ist eine gemeinsame Excel-Datei für Planung, Tracking und Mobility. Jede App schreibt nach Änderungen automatisch nur ihre eigenen Blätter hinein und liest beim Öffnen, was die anderen Apps eingetragen haben. Verbinde in allen drei Apps dieselbe Datei.</p>
+    </div>`;
+  }
+  const escL = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+  function refresh(){ if(!APP) return; document.querySelectorAll("[data-lnk-section]").forEach(el => { el.innerHTML = sectionHtml(); }); if(APP && APP.onStatus) APP.onStatus(); }
+  function toast(msg){
+    let t = document.getElementById("lnkToast");
+    if(!t){ t = document.createElement("div"); t.id = "lnkToast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+    t.textContent = msg; t.classList.add("on"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 3800);
+  }
+  function injectCss(){
+    if(document.getElementById("lnkCss")) return;
+    const st = document.createElement("style"); st.id = "lnkCss";
+    st.textContent = `.lnk-row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid rgba(127,127,127,.2)}
+      .lnk-main{flex:1;min-width:180px}.lnk-lab{font-weight:700;font-size:14px}.lnk-ro{font-weight:500;font-size:11px;opacity:.7;border:1px solid rgba(127,127,127,.4);border-radius:5px;padding:0 5px;margin-left:4px}
+      .lnk-file{font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-all}.lnk-st{font-size:12px;opacity:.75}.lnk-warn{color:#B23A2E;opacity:1;font-weight:600}
+      .lnk-apps{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px}.lnk-apps span{font-size:12px;font-weight:600;border-radius:6px;padding:2px 8px;border:1px solid rgba(127,127,127,.35);opacity:.6}.lnk-apps span.on{opacity:1;background:#2E6F72;border-color:#2E6F72;color:#fff}
+      .lnk-help{font-size:12px;opacity:.7;line-height:1.45;margin-top:3px}.lnk-btns{display:flex;gap:6px;flex-wrap:wrap}.lnk-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+      #lnkToast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#191C18;color:#FAFAF7;padding:10px 16px;border-radius:10px;font:600 13.5px/1.35 system-ui,sans-serif;z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+      #lnkToast.on{opacity:1}`;
+    document.head.appendChild(st);
+  }
+  document.addEventListener("click", async e => {
+    const b = e.target.closest && e.target.closest("[data-lnk]"); if(!b || !APP) return;
+    e.preventDefault(); e.stopPropagation();
+    const [act, slot] = b.getAttribute("data-lnk").split("|");
+    try{
+      if(act === "pick" || act === "create"){
+        await pick(slot, act === "create");
+        const s = APP.slots.find(x => x.id === slot);
+        if(s && s.write){ links[slot].lastHash = null; links[slot].othersHash = null; }
+        refresh(); await sync(true);
+      } else if(act === "unlink"){
+        if(!confirm("Verbindung trennen? Die Datei selbst bleibt unverändert.")) return;
+        const l = links[slot]; delete links[slot]; store();
+        try{ if(l && l.backend === "native") await P().release({ uri:l.uri }); }catch(_){}
+        refresh();
+      } else if(act === "sync"){ await sync(true); }
+      else if(act === "save"){ busy = true; try{ if(await doSave(false)) toast("In die Mappe gespeichert"); } finally{ busy = false; refresh(); } }
+    }catch(err){ const m = err && (err.message || err.name) || String(err); if(!/cancel|abort/i.test(m)) toast(m); }
+  }, true);
+  document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible" && APP && Object.keys(links).length) sync(false); });
+
+  return {
+    init(app){ APP = app; load(); injectCss(); refresh(); if(Object.keys(links).length) sync(false); else ready = true; },
+    changed, sync: () => sync(true), saveNow: async () => { if(!links.mappe) return false; busy = true; try{ return await doSave(false); } finally{ busy = false; refresh(); } },
+    linked: () => !!links.mappe, available, sectionHtml, refresh, toast
+  };
+})();
+
+/* ---- Tracking ↔ Planungsmappe ---- */
+const TRACK_LINK={
+  key:"tracking", ownFirst:false, saveDelay:2000,
+  slots:[{id:"mappe",label:"Planungsmappe",write:true,suggest:"planungsmappe.xlsx",help:"Gemeinsame Datei aller drei Apps. Tracking schreibt hier Sessions, Kraft, Messungen, Gewicht, Wochen-Check und deine Ziel-Notizen hinein und liest die Wochenziele der Planung."},
+         {id:"sensor",label:"Trainingsdatei (Sprung & Griffkraft)",write:false,help:"Am einfachsten dieselbe training-daten.json bzw. polar-all.json aus deinem Apps Script wie in der Planung — die App liest daraus den Block „sprung“. Eine einzelne Sensor-Datei (Excel, CSV, JSON) geht auch. Neue Sessions kommen ohne Doubletten dazu; das Bein erkennt die App am Namen („… left leg“ / „… right leg“)."}],
+  ownSheets:()=>TRACK_SHEETS,
+  readsSheets:()=>["Ziele","Phasen","Skala"],
+  buildOwn:()=>buildWorkbook(),
+  importOwn:wb=>{const {state,issues}=parseTrackingWb(wb);applyLoaded(state,null);if(issues.length)console.warn(issues);},
+  consume:wb=>{if(!wb.Sheets["Ziele"]&&!wb.Sheets["Phasen"])return "";try{GOALS=parsePlanWb(wb,"Planungsmappe");lsSet(LS_GOALS,GOALS);const sy=reconcileNotes();return "Wochenziele aktualisiert"+(sy?` (${sy} Notiz(en) synchron)`:"");}catch(e){return "";}},
+  consumeInput:(slot,wb,name)=>{if(slot!=="sensor")return "";const msg=[];
+    if(wb.__json!==undefined){const g=gripSensorSessions(wb.__json);if(g.length){const r=mergeGrip(g);if(r.added)msg.push(r.added+" neue Griffkraft-Einheit"+(r.added===1?"":"en"));}
+      let jw=null;try{jw=jumpJsonToWb(wb.__json);}catch(_){}if(jw){const r=mergeJump(parseJumpWb(jw,name));if(r.added)msg.push(r.added+" neue Sprung-Session"+(r.added===1?"":"s"));}}
+    else{const r=mergeJump(parseJumpWb(wb,name));if(r.added)msg.push(r.added+" neue Sprung-Session"+(r.added===1?"":"s"));}
+    if(msg.length)persist();return msg.join(" · ");},
+  isDirty:()=>!!S.meta.dirty,
+  markClean:()=>{S.meta.dirty=false;S.meta.lastSaved=Date.now();persist(false);},
+  afterChange:()=>render(),
+  ui:{btn:"btn small",primary:"btn primary small",hint:"hint"}
+};
+(async function boot(){
+  if(fsSupported){try{const h=await idb("readonly",st=>st.get("dir"));if(h)dirHandle=h;}catch(e){}}
+  if(typeof XLSX==="undefined")toast("Excel-Bibliothek nicht geladen — Internetverbindung prüfen");
+  render();LINK.init(TRACK_LINK);})();
+
+</script>
+</body>
+</html>
