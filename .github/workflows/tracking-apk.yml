@@ -1,0 +1,328 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Tracking-App als APK bauen — mit GitHub Actions, ohne Android Studio
+#
+# Ablage im Repository:  .github/workflows/tracking-apk.yml
+# Daneben im Repository: tracking.html  (im Hauptordner)
+#
+# Start: automatisch bei jeder Änderung an tracking.html — oder von Hand unter
+#        GitHub ▸ Actions ▸ „Tracking-APK bauen“ ▸ „Run workflow“.
+# Ergebnis: Release „tracking-latest“ mit Tracking.apk (auf dem Handy direkt
+#           herunterladbar) + zusätzlich als Artefakt im Lauf.
+#
+# Wichtig (einmalig): damit neue APKs die installierte App ERSETZEN statt neu
+# installiert werden müssen, braucht jeder Build denselben Signaturschlüssel.
+# Beim ersten Lauf erzeugt der Workflow einen und legt ihn als Artefakt
+# „signierschluessel“ ab. Den Inhalt der Datei als Repository-Secret
+# SIGNING_KEYSTORE_B64 speichern (Settings ▸ Secrets and variables ▸ Actions).
+# ─────────────────────────────────────────────────────────────────────────────
+name: Tracking-APK bauen
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tracking.html"
+      - ".github/workflows/tracking-apk.yml"
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: "Tracking"
+  APP_ID: "ch.training.tracking"
+  HTML_FILE: "tracking.html"
+  XLSX_URL: "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Repository holen
+        uses: actions/checkout@v4
+
+      - name: Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Signaturschlüssel bereitstellen
+        env:
+          KS_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+        run: |
+          mkdir -p ~/.android
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > ~/.android/debug.keystore
+            echo "Gespeicherter Schlüssel wird verwendet."
+          else
+            keytool -genkeypair -v -keystore ~/.android/debug.keystore -storepass android \
+              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            mkdir -p schluessel
+            base64 -w0 ~/.android/debug.keystore > schluessel/SIGNING_KEYSTORE_B64.txt
+            echo "::warning::Neuer Signaturschlüssel erzeugt. Inhalt von Artefakt 'signierschluessel' als Secret SIGNING_KEYSTORE_B64 speichern — sonst lässt sich die nächste APK nicht über diese installieren."
+          fi
+
+      - name: Neuen Schlüssel als Artefakt ablegen (nur beim ersten Mal)
+        if: ${{ hashFiles('schluessel/SIGNING_KEYSTORE_B64.txt') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: signierschluessel
+          path: schluessel/SIGNING_KEYSTORE_B64.txt
+
+      - name: Capacitor-Projekt anlegen
+        run: |
+          mkdir -p app/www
+          cd app
+          cp "../$HTML_FILE" www/index.html
+          # Excel-Baustein lokal einbinden → App läuft offline
+          curl -fsSL "$XLSX_URL" -o www/xlsx.bundle.js
+          sed -i -E 's#<script\s+src="https://cdn\.jsdelivr\.net/npm/xlsx-js-style@[^"]+"\s*>\s*</script>#<script src="xlsx.bundle.js"></script>#' www/index.html
+          grep -q 'src="xlsx.bundle.js"' www/index.html && echo "Excel-Baustein lokal eingebunden."
+          npm init -y >/dev/null
+          npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/filesystem@7 @capacitor/share@7
+          npx cap init "$APP_NAME" "$APP_ID" --web-dir www
+          npx cap add android
+
+      - name: Datei-Erweiterung (Java) bereitlegen
+        run: |
+          mkdir -p app
+          cat > app/LinkedFilePlugin.java.tmpl <<'JAVA'
+          package __PKG__;
+
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.database.Cursor;
+          import android.net.Uri;
+          import android.os.ParcelFileDescriptor;
+          import android.provider.DocumentsContract;
+          import android.provider.OpenableColumns;
+          import android.util.Base64;
+
+          import androidx.activity.result.ActivityResult;
+
+          import com.getcapacitor.JSObject;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.ActivityCallback;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+
+          import java.io.ByteArrayOutputStream;
+          import java.io.FileOutputStream;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+
+          /**
+           * LinkedFile — eine Datei einmal auswählen und dauerhaft lesen/schreiben dürfen
+           * (Storage Access Framework mit „persistable URI permission“). Funktioniert mit
+           * Dateien auf dem Handy und bei Anbietern wie Google Drive.
+           * Automatisch erzeugt von setup_apps.py.
+           */
+          @CapacitorPlugin(name = "LinkedFile")
+          public class LinkedFilePlugin extends Plugin {
+
+              private static final int RW = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+
+              @PluginMethod
+              public void pick(PluginCall call) {
+                  Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                  i.addCategory(Intent.CATEGORY_OPENABLE);
+                  i.setType("*/*");
+                  i.addFlags(RW | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                  startActivityForResult(call, i, "pickResult");
+              }
+
+              @PluginMethod
+              public void create(PluginCall call) {
+                  Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                  i.addCategory(Intent.CATEGORY_OPENABLE);
+                  i.setType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                  i.putExtra(Intent.EXTRA_TITLE, call.getString("name", "planungsmappe.xlsx"));
+                  i.addFlags(RW | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                  startActivityForResult(call, i, "pickResult");
+              }
+
+              @ActivityCallback
+              private void pickResult(PluginCall call, ActivityResult result) {
+                  if (call == null) return;
+                  if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
+                      call.reject("cancelled");
+                      return;
+                  }
+                  Uri uri = result.getData().getData();
+                  boolean wantWrite = call.getBoolean("write", false);
+                  boolean writable = false;
+                  try {
+                      if (wantWrite) {
+                          getContext().getContentResolver().takePersistableUriPermission(uri, RW);
+                          writable = true;
+                      } else {
+                          getContext().getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                      }
+                  } catch (SecurityException e) {
+                      try { getContext().getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (SecurityException ignore) { }
+                  }
+                  JSObject r = info(uri);
+                  r.put("uri", uri.toString());
+                  r.put("writable", writable);
+                  call.resolve(r);
+              }
+
+              @PluginMethod
+              public void read(PluginCall call) {
+                  String u = call.getString("uri");
+                  if (u == null) { call.reject("uri fehlt"); return; }
+                  Uri uri = Uri.parse(u);
+                  try (InputStream in = getContext().getContentResolver().openInputStream(uri)) {
+                      if (in == null) { call.reject("Datei nicht lesbar"); return; }
+                      ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                      byte[] buf = new byte[65536];
+                      int n;
+                      while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+                      JSObject r = info(uri);
+                      r.put("data", Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP));
+                      call.resolve(r);
+                  } catch (SecurityException e) {
+                      call.reject("Keine Berechtigung mehr — bitte die Datei neu verbinden");
+                  } catch (Exception e) {
+                      call.reject("Lesen fehlgeschlagen: " + e.getMessage());
+                  }
+              }
+
+              @PluginMethod
+              public void write(PluginCall call) {
+                  String u = call.getString("uri");
+                  if (u == null) { call.reject("uri fehlt"); return; }
+                  Uri uri = Uri.parse(u);
+                  byte[] bytes = Base64.decode(call.getString("data", ""), Base64.DEFAULT);
+                  Exception last = null;
+                  // 1) „wt“ = schreiben + vorher leeren (Standard)
+                  try (OutputStream out = getContext().getContentResolver().openOutputStream(uri, "wt")) {
+                      if (out != null) { out.write(bytes); out.flush(); call.resolve(info(uri)); return; }
+                  } catch (Exception e) { last = e; }
+                  // 2) Fallback für Anbieter ohne „wt“: öffnen, selbst kürzen, schreiben
+                  for (String mode : new String[]{"rw", "w"}) {
+                      try (ParcelFileDescriptor pfd = getContext().getContentResolver().openFileDescriptor(uri, mode)) {
+                          if (pfd == null) continue;
+                          try (FileOutputStream out = new FileOutputStream(pfd.getFileDescriptor())) {
+                              try { out.getChannel().truncate(0); } catch (Exception ignore) { }
+                              out.write(bytes);
+                              out.flush();
+                          }
+                          call.resolve(info(uri));
+                          return;
+                      } catch (Exception e) { last = e; }
+                  }
+                  call.reject("Schreiben fehlgeschlagen: " + (last != null ? last.getMessage() : "unbekannt"));
+              }
+
+              @PluginMethod
+              public void stat(PluginCall call) {
+                  String u = call.getString("uri");
+                  if (u == null) { call.reject("uri fehlt"); return; }
+                  call.resolve(info(Uri.parse(u)));
+              }
+
+              @PluginMethod
+              public void release(PluginCall call) {
+                  String u = call.getString("uri");
+                  if (u != null) {
+                      try { getContext().getContentResolver().releasePersistableUriPermission(Uri.parse(u), RW); }
+                      catch (Exception e) {
+                          try { getContext().getContentResolver().releasePersistableUriPermission(Uri.parse(u), Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (Exception ignore) { }
+                      }
+                  }
+                  call.resolve();
+              }
+
+              private JSObject info(Uri uri) {
+                  JSObject r = new JSObject();
+                  try (Cursor c = getContext().getContentResolver().query(uri, null, null, null, null)) {
+                      if (c != null && c.moveToFirst()) {
+                          int ni = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                          int si = c.getColumnIndex(OpenableColumns.SIZE);
+                          int mi = c.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED);
+                          if (ni >= 0) r.put("name", c.getString(ni));
+                          if (si >= 0 && !c.isNull(si)) r.put("size", c.getLong(si));
+                          if (mi >= 0 && !c.isNull(mi)) r.put("lastModified", c.getLong(mi));
+                      }
+                  } catch (Exception ignore) { }
+                  return r;
+              }
+          }
+          JAVA
+
+      - name: Speicher-Erlaubnis + Datei-Erweiterung (dauerhaft verbundene Dateien)
+        run: |
+          cd app
+          python3 - <<'PY'
+          import os, re
+          app_id = os.environ["APP_ID"]
+          # 1) AndroidManifest: Speicher-Erlaubnis für ältere Android-Versionen
+          mf = "android/app/src/main/AndroidManifest.xml"
+          xml = open(mf, encoding="utf-8").read()
+          perms = ('<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>\n    '
+                   '<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>\n\n    ')
+          if "READ_EXTERNAL_STORAGE" not in xml:
+              xml = xml.replace("<application", perms + "<application", 1)
+          if "requestLegacyExternalStorage" not in xml:
+              xml = xml.replace("<application", '<application\n        android:requestLegacyExternalStorage="true"', 1)
+          open(mf, "w", encoding="utf-8").write(xml)
+          # 2) LinkedFile-Plugin neben MainActivity ablegen und registrieren
+          main = None
+          for root, _d, files in os.walk("android/app/src/main/java"):
+              if "MainActivity.java" in files:
+                  main = os.path.join(root, "MainActivity.java")
+          src = open(main, encoding="utf-8").read()
+          pkg = re.search(r"^\s*package\s+([\w.]+)\s*;", src, re.M).group(1)
+          java = open(os.path.join(os.environ["GITHUB_WORKSPACE"], "app", "LinkedFilePlugin.java.tmpl"), encoding="utf-8").read()
+          open(os.path.join(os.path.dirname(main), "LinkedFilePlugin.java"), "w", encoding="utf-8").write(java.replace("__PKG__", pkg))
+          if "LinkedFilePlugin" not in src:
+              src = re.sub(r"public class MainActivity extends BridgeActivity\s*\{\s*\}",
+                           "public class MainActivity extends BridgeActivity {\n"
+                           "    @Override\n"
+                           "    public void onCreate(android.os.Bundle savedInstanceState) {\n"
+                           "        registerPlugin(LinkedFilePlugin.class);\n"
+                           "        super.onCreate(savedInstanceState);\n"
+                           "    }\n}", src, count=1)
+              open(main, "w", encoding="utf-8").write(src)
+          print("Manifest und LinkedFile-Plugin vorbereitet:", main)
+          PY
+        env:
+          APP_ID: ${{ env.APP_ID }}
+
+      - name: Synchronisieren und APK bauen
+        run: |
+          cd app
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --console=plain
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/out/$APP_NAME.apk"
+          ls -la "$GITHUB_WORKSPACE/out"
+
+      - name: APK als Artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tracking-apk
+          path: out/Tracking.apk
+
+      - name: Release „tracking-latest“ aktualisieren (Download direkt aufs Handy)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTE="Gebaut am $(date -u '+%d.%m.%Y %H:%M') UTC aus ${GITHUB_SHA::7}. Auf dem Handy: Tracking.apk antippen und installieren."
+          if gh release view tracking-latest >/dev/null 2>&1; then
+            gh release upload tracking-latest out/Tracking.apk --clobber
+            gh release edit tracking-latest --notes "$NOTE"
+          else
+            gh release create tracking-latest out/Tracking.apk --title "Tracking — aktuelle APK" --notes "$NOTE" --prerelease
+          fi
