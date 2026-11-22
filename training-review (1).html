@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Datenschutz: Grundrichtlinie. Downloads von Modell-Dateien (nur Modus „Im Gerät“) sind von Hugging Face / GitHub erlaubt.
+     Beim Start (Ollama/llama.cpp) bzw. spätestens vor dem ersten Senden (Im Gerät) setzt die App eine zweite, strengere Richtlinie:
+     danach sind nur noch Verbindungen zu diesem Gerät (localhost / 127.0.0.1) möglich – bis zum Neustart der App. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file: 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https://huggingface.co https://*.huggingface.co https://*.hf.co https://raw.githubusercontent.com https://cdn.jsdelivr.net; worker-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>Trainings-Review</title>
+<style>
+:root{--bg:#F3F5F2;--card:#fff;--ink:#191C18;--mut:#5E665C;--line:#DCE2D9;--pri:#0F6E63;--pri-ink:#fff;--pri2:#E2EFEB;--warn:#A85A12;--warn2:#FBF0E2;--bad:#B23A2E;--ok:#3C7A33;--code:#EEF2EC;--shadow:0 1px 2px rgba(0,0,0,.05)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#111412;--card:#1A1E1B;--ink:#E6EBE5;--mut:#9AA39A;--line:#2C332E;--pri:#4FB3A4;--pri-ink:#0D1F1C;--pri2:#16312D;--warn:#E0A060;--warn2:#2E2418;--bad:#E07468;--ok:#7CC070;--code:#222823}}
+:root[data-theme=dark]{--bg:#111412;--card:#1A1E1B;--ink:#E6EBE5;--mut:#9AA39A;--line:#2C332E;--pri:#4FB3A4;--pri-ink:#0D1F1C;--pri2:#16312D;--warn:#E0A060;--warn2:#2E2418;--bad:#E07468;--ok:#7CC070;--code:#222823}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:-.01em}
+.shield{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--pri);background:var(--pri2);padding:4px 10px;border-radius:99px;font-weight:600}
+.shield svg{width:14px;height:14px}
+header .sp{flex:1}
+aside,main{min-width:0}
+.mobonly{display:none!important}
+@media (max-width:900px){
+  .mobonly{display:inline-block!important}
+  main{order:-1}
+  aside{display:none}
+  body.setup aside{display:block}
+  body.setup main .pane{display:none!important}
+  header{padding:10px 16px;gap:8px}
+  header h1{font-size:17px}
+  #hdrModel{display:none}
+  .tabs{position:sticky;top:0;background:var(--bg);z-index:4;margin:0 -16px 12px;padding:0 8px}
+  .tabs button{padding:10px 11px;font-size:14px}
+  .card{padding:12px 14px}
+  .msg.user{margin-left:8%}
+  #dos{min-height:60vh}
+  .follow{position:sticky;bottom:0;background:var(--card);padding:8px 0 4px}
+  header{position:static}
+}
+.shield.open{color:var(--warn);background:var(--warn2)}
+.prog{font-size:12.5px;color:var(--mut);margin-top:6px;white-space:pre-wrap}
+.wrap{display:grid;grid-template-columns:minmax(300px,390px) 1fr;gap:18px;padding:18px 20px;max-width:1500px;margin:0 auto}
+@media (max-width:900px){.wrap{grid-template-columns:1fr;padding:14px 16px}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.card h2 .n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--pri);color:var(--pri-ink);font-size:11px;letter-spacing:0}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;font-size:14px}
+textarea{resize:vertical;min-height:70px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1}
+.row>.auto{flex:0 0 auto}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--pri)}
+.btn.pri{background:var(--pri);color:var(--pri-ink);border-color:var(--pri)}
+.btn.big{padding:11px 16px;font-size:15px;width:100%}
+.btn.sm{padding:4px 10px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--pri)}
+.muted{color:var(--mut);font-size:13px}
+.small{font-size:12.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 10px;font-size:13px;cursor:pointer;user-select:none;background:var(--bg)}
+.chip input{margin:0;accent-color:var(--pri)}
+.chip.on{border-color:var(--pri);background:var(--pri2)}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--bg);color:var(--ink);padding:8px 6px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--pri);color:var(--pri-ink)}
+.file{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px dashed var(--line);border-radius:9px;margin-bottom:8px}
+.file .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:14px}
+.file .nm small{display:block;font-weight:400;color:var(--mut);font-size:12px}
+.file.ok{border-style:solid;border-color:var(--pri);background:var(--pri2)}
+.status{font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mut);flex:0 0 auto}
+.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow-x:auto}
+.tabs button{border:0;background:none;color:var(--mut);font:inherit;font-weight:600;font-size:14px;padding:9px 14px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--pri)}
+.pane{display:none}.pane.on{display:block}
+.out{min-height:300px}
+.md{line-height:1.6}
+.md h2{font-size:18px;margin:22px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.md h3{font-size:16px;margin:18px 0 6px}
+.md h4,.md h5{font-size:15px;margin:14px 0 4px}
+.md p{margin:8px 0}
+.md ul,.md ol{margin:6px 0;padding-left:22px}
+.md li{margin:3px 0}
+.md code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:.9em}
+.md pre{background:var(--code);padding:10px;border-radius:8px;overflow-x:auto;font-size:13px}
+.md .tw{overflow-x:auto}
+.md table{border-collapse:collapse;margin:8px 0;font-size:14px}
+.md th,.md td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+.md th{background:var(--pri2)}
+.msg{margin:14px 0}
+.msg.user{background:var(--pri2);border-radius:10px;padding:10px 14px;margin-left:15%}
+.msg.user .who{font-size:12px;color:var(--mut);margin-bottom:2px}
+.sent{font-size:13px;color:var(--mut);border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--bg)}
+details.think,details.panel{border:1px solid var(--line);border-radius:10px;padding:6px 12px;margin:10px 0;background:var(--bg)}
+details summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--mut)}
+details.think .tt{white-space:pre-wrap;font-size:13px;color:var(--mut);max-height:300px;overflow:auto}
+.cursor::after{content:"▍";animation:bl 1s steps(1) infinite;color:var(--pri)}
+@keyframes bl{50%{opacity:0}}
+.follow{display:flex;gap:8px;margin-top:14px;align-items:flex-end}
+.follow textarea{min-height:46px}
+.empty{padding:40px 20px;text-align:center;color:var(--mut)}
+.empty h3{color:var(--ink);margin:0 0 6px}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--pri)}
+.bar.warn i{background:var(--warn)}.bar.bad i{background:var(--bad)}
+#dos{min-height:520px;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.note{background:var(--warn2);border-left:3px solid var(--warn);padding:8px 12px;border-radius:6px;font-size:13.5px;margin:8px 0}
+.note.info{background:var(--pri2);border-color:var(--pri)}
+.hist{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.hist .t{flex:1;min-width:0}
+.hist .t b{display:block;font-size:14px}
+.sheetlist{font-size:12.5px;color:var(--mut);margin-top:4px;line-height:1.55}
+.sheetlist b{color:var(--ink);font-weight:600}
+.help h3{font-size:15px;margin:18px 0 6px}
+.help code,.help pre{background:var(--code);border-radius:5px;font-size:13px}
+.help code{padding:1px 5px}
+.help pre{padding:10px;overflow-x:auto;white-space:pre-wrap}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;max-width:90vw;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+.lit{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+.lit .t{flex:1;min-width:0}
+.hide{display:none!important}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Trainings-Review</h1>
+  <span class="shield" id="shield" title="Content-Security-Policy: Dieses Fenster darf nur Verbindungen zu localhost / 127.0.0.1 aufbauen."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span id="shieldTxt">Nur lokal · keine Daten verlassen dieses Gerät</span></span>
+  <span class="sp"></span>
+  <span class="muted small" id="hdrModel"></span>
+</header>
+
+<div class="wrap">
+<aside>
+  <section class="card">
+    <h2><span class="n">1</span>Daten</h2>
+    <div class="file" id="f_mappe"><div class="nm">Planungsmappe<small>.xlsx – Pflicht</small></div><button class="btn sm ghost hide" data-other="mappe">Andere…</button><button class="btn sm pri" data-pick="mappe">Wählen</button></div>
+    <div class="file" id="f_json"><div class="nm">Trainingsdatei<small>.json – optional (Polar, Schlaf, HRV, Velo, Griff, Sprung)</small></div><button class="btn sm ghost hide" data-other="json">Andere…</button><button class="btn sm" data-pick="json">Wählen</button></div>
+    <input type="file" id="in_mappe" accept=".xlsx,.xlsm,.xls" class="hide">
+    <input type="file" id="in_json" accept=".json,application/json" class="hide">
+    <div class="sheetlist" id="sheetInfo"></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">2</span>Lokales Modell</h2>
+    <div class="seg" id="beSeg"><button data-be="ollama" title="Ollama – am Handy in Termux, am Computer als App">Ollama</button><button data-be="openai" title="llama.cpp-Server (Termux), LM Studio, Jan …">llama.cpp / OpenAI</button><button data-be="webgpu" title="Modell läuft direkt in dieser App (WebGPU)">Im Gerät</button></div>
+    <div id="srvBox">
+    <label for="url">Adresse auf diesem Gerät</label>
+    <div class="row"><input type="text" id="url" spellcheck="false" inputmode="url"><button class="btn auto" id="btnTest">Verbinden</button></div>
+    <label for="model">Modell</label>
+    <select id="model"><option value="">– erst verbinden –</option></select>
+    </div>
+    <div id="wgBox" class="hide">
+    <label for="wgModel">Modell (läuft in der App über die Grafikeinheit)</label>
+    <select id="wgModel"><option value="">– prüfen –</option></select>
+    <div class="row" style="margin-top:8px"><button class="btn auto" id="btnWgCheck">Gerät prüfen</button><button class="btn pri auto" id="btnWgLoad">Modell laden</button></div>
+    <div class="prog" id="wgProg"></div>
+    </div>
+    <div class="status" id="connStatus"><span class="dot"></span><span>nicht verbunden</span></div>
+    <label class="chip" style="margin-top:8px;display:inline-flex" title="Qwen3 &amp; Co. denken sonst lange vor der Antwort – auf dem Handy oft Minuten."><input type="checkbox" id="noThink"> Schnellmodus (Denkphase aus)</label>
+    <details style="margin-top:8px"><summary class="small">Feineinstellungen</summary>
+      <div class="row"><div><label for="numCtx">Kontextlänge (Tokens)</label><select id="numCtx"><option>4096</option><option>8192</option><option>16384</option><option>32768</option><option>65536</option><option>131072</option></select></div>
+      <div><label for="temp">Temperatur</label><input type="number" id="temp" min="0" max="1.5" step="0.1"></div></div>
+      <p class="muted small" style="margin:6px 0 0">Kontextlänge gilt für Ollama direkt; bei LM Studio beim Laden des Modells einstellen. Niedrige Temperatur (0.2–0.5) = nüchterner, weniger Fantasie.</p>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">3</span>Review</h2>
+    <div class="seg" id="modeSeg">
+      <button data-mode="woche" title="Fokuswoche im Kontext der Vorwochen">Woche</button>
+      <button data-mode="block" title="Ganzer Zeitraum als Trainingsblock">Block</button>
+      <button data-mode="ausblick" title="Passen die kommenden Planwochen?">Ausblick</button>
+      <button data-mode="frage" title="Eigene Frage">Frage</button>
+    </div>
+    <div class="row" style="margin-top:4px">
+      <div><label for="focus">Fokuswoche</label><input type="date" id="focus"></div>
+      <div style="flex:0 0 74px"><label for="back">zurück</label><select id="back"></select></div>
+      <div style="flex:0 0 74px"><label for="ahead">voraus</label><select id="ahead"></select></div>
+    </div>
+    <div class="muted small" id="rangeInfo"></div>
+    <label for="question" id="qLabel">Kontext / Frage (optional)</label>
+    <textarea id="question" placeholder="z. B. Ich fühle mich seit KW45 müde – ist der Deload ausreichend? Wettkampf am 12.12."></textarea>
+
+    <label>Außenperspektive</label>
+    <div class="chips" id="perspChips"></div>
+    <label class="chip" style="margin-top:8px;display:inline-flex" title="Jede Perspektive bekommt einen eigenen Durchlauf, danach eine Synthese. Gründlicher, dauert entsprechend länger."><input type="checkbox" id="panel"> Gremium: jede Perspektive einzeln, dann Synthese</label>
+
+    <details style="margin-top:10px"><summary class="small">Was ins Dossier kommt</summary>
+      <div class="chips" id="incChips" style="margin-top:8px"></div>
+      <label for="profile">Athletenprofil (bleibt lokal gespeichert)</label>
+      <textarea id="profile" placeholder="Alter, Trainingsalter, Ziele der Saison, Wettkämpfe, Verletzungshistorie, verfügbare Zeit pro Woche …"></textarea>
+      <label class="chip" style="margin-top:8px;display:inline-flex"><input type="checkbox" id="kb"> Wissensanker (kuratierte Grundlagen + Quellen) mitsenden</label>
+      <label class="chip" style="margin-top:8px;display:inline-flex" title="Verdichtet das Dossier auf das Wesentliche – nötig für kleine Modelle auf dem Handy (Kontext 4–8k)."><input type="checkbox" id="compact"> Kompakt (für kleine Modelle / Handy)</label>
+      <label class="chip" style="margin-top:8px;display:inline-flex" title="Wenn das Dossier nicht in die Kontextlänge passt: erst Zeitraum verkürzen, dann weniger wichtige Bereiche weglassen."><input type="checkbox" id="autoFit"> Automatisch auf Kontextlänge kürzen</label>
+    </details>
+    <div style="margin-top:14px;display:grid;gap:8px">
+      <button class="btn pri big" id="btnRun">Review starten</button>
+      <div class="row"><button class="btn" id="btnShowDos">Dossier ansehen</button><button class="btn hide" id="btnStop">Stopp</button></div>
+    </div>
+  </section>
+</aside>
+
+<main>
+  <nav class="tabs" id="tabs">
+    <button data-tab="setup" class="mobonly">Einrichten</button>
+    <button data-tab="review" class="on">Review</button>
+    <button data-tab="dossier">Dossier <span class="muted small" id="tokBadge"></span></button>
+    <button data-tab="lit">Eigene Literatur</button>
+    <button data-tab="hist">Verlauf</button>
+    <button data-tab="help">Hilfe</button>
+  </nav>
+
+  <section class="pane on card" id="p_review">
+    <div class="row" style="justify-content:flex-end;gap:8px" id="revTools">
+      <span class="muted small" id="revMeta" style="flex:1"></span>
+      <label class="chip auto" style="margin:0"><input type="checkbox" id="expDos"> Dossier anhängen</label>
+      <button class="btn sm auto" id="btnExport" disabled>Als Markdown speichern</button>
+      <button class="btn sm auto" id="btnCopy" disabled>Kopieren</button>
+    </div>
+    <div class="out" id="conv">
+      <div class="empty"><h3>Externer Blick auf dein Training – komplett offline</h3>
+      <p>1&nbsp;Planungsmappe wählen · 2&nbsp;lokales Modell verbinden · 3&nbsp;Review starten.<br>Vor dem Senden kannst du im Tab <b>Dossier</b> genau sehen (und kürzen), was das Modell bekommt.</p></div>
+    </div>
+    <div class="follow hide" id="followBox">
+      <textarea id="followIn" placeholder="Nachfrage, z. B. „Wie würdest du KW48 konkret umbauen?“"></textarea>
+      <button class="btn pri auto" id="btnFollow">Senden</button>
+    </div>
+  </section>
+
+  <section class="pane card" id="p_dossier">
+    <div class="row" style="margin-bottom:8px">
+      <div class="muted small" id="dosInfo" style="flex:1"></div>
+      <button class="btn sm auto" id="btnRebuild">Neu erzeugen</button>
+    </div>
+    <div class="bar" id="tokBar"><i style="width:0"></i></div>
+    <p class="muted small">Das ist der vollständige Text, den das lokale Modell bekommt (plus Anweisungen und ggf. Wissensanker/Literatur). Du kannst hier kürzen oder ergänzen – Änderungen gelten bis zum nächsten „Neu erzeugen“.</p>
+    <textarea id="dos" spellcheck="false"></textarea>
+    <details style="margin-top:10px"><summary class="small">Anweisungen an das Modell (System-Prompt) ansehen</summary><pre id="sysPreview" style="white-space:pre-wrap;font-size:12.5px;background:var(--code);padding:10px;border-radius:8px;max-height:420px;overflow:auto"></pre></details>
+  </section>
+
+  <section class="pane card" id="p_lit">
+    <p class="muted">Eigene Texte als zusätzliche Wissensbasis: Zusammenfassungen von Studien, Skripte, Notizen aus Fortbildungen, Trainerhinweise. Nur Text (.txt / .md) – aus PDFs den relevanten Abschnitt hineinkopieren. Alles bleibt in diesem Browser; nur eingeschaltete Einträge werden mitgeschickt.</p>
+    <div class="row"><button class="btn auto" id="btnLitFile">Textdateien hinzufügen</button><button class="btn auto" id="btnLitPaste">Text einfügen</button><input type="file" id="in_lit" accept=".txt,.md,text/plain,text/markdown" multiple class="hide"></div>
+    <div id="litPaste" class="hide" style="margin-top:10px"><input type="text" id="litTitle" placeholder="Titel, z. B. Seiler 2010 – Intensitätsverteilung (Notizen)"><textarea id="litText" style="margin-top:6px;min-height:140px" placeholder="Text …"></textarea><div class="row" style="margin-top:6px;justify-content:flex-end"><button class="btn auto" id="btnLitCancel">Abbrechen</button><button class="btn pri auto" id="btnLitSave">Speichern</button></div></div>
+    <div id="litList" style="margin-top:10px"></div>
+  </section>
+
+  <section class="pane card" id="p_hist">
+    <p class="muted">Gespeicherte Reviews (nur in diesem Browser). Öffnen, um nachzulesen oder weiterzufragen.</p>
+    <div id="histList"></div>
+  </section>
+
+  <section class="pane card help" id="p_help"></section>
+</main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="xlsx.bundle.js"></script>
+<script>if(!window.XLSX){document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"><\/script>');}</script>
+<script>
+"use strict";
+/* ============================================================
+   Grundlagen
+   ============================================================ */
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const LS={get(k,d){try{const v=localStorage.getItem("trv."+k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem("trv."+k,JSON.stringify(v));}catch(e){}}};
+const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+const PL=n=>(NATIVE&&window.Capacitor.Plugins&&window.Capacitor.Plugins[n])||null;
+const PHONE=NATIVE||matchMedia("(max-width:900px)").matches;
+const DEF={backend:"ollama",urlOllama:"http://127.0.0.1:11434",urlOpenai:"http://127.0.0.1:8080",model:"",wgModel:"",numCtx:PHONE?8192:16384,temp:0.4,mode:"woche",back:PHONE?4:6,ahead:2,persp:["tw","load"],panel:false,
+  inc:{plan:1,polar:1,erh:1,sess:1,kraft:1,griff:1,sprung:1,velo:1,mob:1,gew:1,extra:1},kb:true,profile:"",compact:PHONE,noThink:PHONE,autoFit:true};
+let ST=Object.assign({},DEF,LS.get("settings",{}));ST.inc=Object.assign({},DEF.inc,ST.inc||{});
+const save=()=>LS.set("settings",ST);
+const MODES_FULL={woche:{back:6,ahead:2},block:{back:12,ahead:0},ausblick:{back:4,ahead:6},frage:{back:8,ahead:4}};
+const MODES_COMPACT={woche:{back:4,ahead:2},block:{back:8,ahead:0},ausblick:{back:3,ahead:4},frage:{back:4,ahead:2}};
+/* Kompakt gilt automatisch bei kleiner Kontextlänge (≤ 8192) */
+const isCompact=()=>!!ST.compact||+ST.numCtx<=8192;
+const modeDefaults=m=>(isCompact()?MODES_COMPACT:MODES_FULL)[m];
+let toastT;function toast(m,ms=3200){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),ms);}
+
+/* ---------- IndexedDB (Datei-Verknüpfungen, Verlauf, Literatur) ---------- */
+const IDB={p:null,open(){return this.p||(this.p=new Promise((res,rej)=>{const r=indexedDB.open("training-review",1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore("kv");d.createObjectStore("reviews",{keyPath:"id"});d.createObjectStore("lit",{keyPath:"id"});};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}));},
+  async tx(store,mode,fn){const d=await this.open();return new Promise((res,rej)=>{const t=d.transaction(store,mode);let out;const q=fn(t.objectStore(store));if(q)q.onsuccess=()=>{out=q.result;};t.oncomplete=()=>res(out);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error);});},
+  get(s,k){return this.tx(s,"readonly",o=>o.get(k)).catch(()=>undefined);},put(s,v,k){return this.tx(s,"readwrite",o=>k!==undefined?o.put(v,k):o.put(v)).catch(()=>{});},
+  del(s,k){return this.tx(s,"readwrite",o=>o.delete(k)).catch(()=>{});},all(s){return this.tx(s,"readonly",o=>o.getAll()).catch(()=>[]);}};
+
+/* ---------- Datum & Wochen ---------- */
+const DAY=864e5;
+function parseD(v){if(v==null||v==="")return null;
+  if(v instanceof Date){if(isNaN(v))return null;return new Date(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate()));}
+  if(typeof v==="number"){if(v>20000&&v<90000)return new Date(Math.round(v-25569)*DAY);return null;}
+  const s=String(v);let m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+  m=s.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);if(m)return new Date(Date.UTC(+m[3],+m[2]-1,+m[1]));return null;}
+const iso=d=>d.toISOString().slice(0,10);
+const addD=(d,n)=>new Date(+d+n*DAY);
+function monday(d){return addD(d,-((d.getUTCDay()+6)%7));}
+const wkOf=v=>{const d=parseD(v);return d?iso(monday(d)):null;};
+const dayOf=v=>{const d=parseD(v);return d?iso(d):null;};
+function isoWeek(d){d=typeof d==="string"?parseD(d):d;const t=addD(d,3-((d.getUTCDay()+6)%7));const y=new Date(Date.UTC(t.getUTCFullYear(),0,4));return 1+Math.round(((t-y)/DAY-3+((y.getUTCDay()+6)%7))/7);}
+const dm=d=>{d=typeof d==="string"?parseD(d):d;return String(d.getUTCDate()).padStart(2,"0")+"."+String(d.getUTCMonth()+1).padStart(2,"0")+".";};
+const wkL=k=>"KW"+isoWeek(k)+" ("+dm(k)+")";
+const WD=["Mo","Di","Mi","Do","Fr","Sa","So"];
+function todayUTC(){const n=new Date();return new Date(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate()));}
+
+/* ---------- Zahlen ---------- */
+const num=v=>{if(v==null||v==="")return null;if(typeof v==="number")return isFinite(v)?v:null;const m=String(v).replace(",",".").match(/-?\d+(\.\d+)?/);return m?parseFloat(m[0]):null;};
+const rangeNum=v=>{if(v==null||v==="")return null;const ns=String(v).replace(/,/g,".").match(/\d+(\.\d+)?/g);if(!ns)return null;const a=ns.map(Number);return a.reduce((s,x)=>s+x,0)/a.length;};
+const vals=a=>a.filter(x=>x!=null&&isFinite(x));
+const avg=a=>{a=vals(a);return a.length?a.reduce((s,x)=>s+x,0)/a.length:null;};
+const sum=a=>vals(a).reduce((s,x)=>s+x,0);
+const sd=a=>{a=vals(a);if(a.length<2)return null;const m=avg(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1));};
+const f1=x=>x==null||!isFinite(x)?"–":String(Math.round(x*10)/10);
+const f0=x=>x==null||!isFinite(x)?"–":String(Math.round(x));
+const f2=x=>x==null||!isFinite(x)?"–":String(Math.round(x*100)/100);
+const pct=(a,b)=>a==null||b==null||!b?null:(a-b)/b*100;
+const sgn=x=>x==null?"–":(x>0?"+":"")+f0(x);
+const hm=sec=>{if(sec==null)return "–";const m=Math.round(sec/60);return Math.floor(m/60)+":"+String(m%60).padStart(2,"0")+" h";};
+const isoDur=s=>{const m=String(s||"").match(/P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?/);if(!m)return null;return (+m[1]||0)*86400+(+m[2]||0)*3600+(+m[3]||0)*60+(+m[4]||0);};
+const cut=(s,n)=>{s=String(s??"").replace(/\s+/g," ").trim();return s.length>n?s.slice(0,n-1)+"…":s;};
+
+/* ============================================================
+   Dateien laden – alles bleibt im Speicher dieses Tabs
+   ============================================================ */
+let WB=null,WBNAME="",WBTIME=null,JS=null,JSNAME="";
+const FH={mappe:null,json:null};
+/* Android-App: Datei einmal verbinden (dauerhafte Lese-Erlaubnis), danach bei jedem Review frisch lesen */
+const LF=()=>PL("LinkedFile");
+const linked=k=>LF()?LS.get("lf_"+k,null):(FH[k]?{name:FH[k].name}:null);
+async function readLinked(kind){const L=LS.get("lf_"+kind,null);if(!L||!LF())return false;const r=await LF().read({uri:L.uri});
+  const bin=atob(r.data||"");const u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  await loadFile(kind,{name:r.name||L.name,lastModified:r.lastModified||null,arrayBuffer:async()=>u8.buffer,text:async()=>new TextDecoder().decode(u8)},true);return true;}
+async function refresh(kind,quiet){try{if(LF()&&LS.get("lf_"+kind,null))return await readLinked(kind);if(FH[kind]){await readHandle(kind);return true;}}catch(e){if(!quiet)showErr(e);}return false;}
+async function pick(kind){
+  if(LF()){try{const r=await LF().pick({write:false});LS.set("lf_"+kind,{uri:r.uri,name:r.name});await readLinked(kind);}catch(e){if(!/cancel/i.test(String(e&&e.message||e)))showErr(e);}return;}
+  if(window.showOpenFilePicker){
+    try{const [h]=await showOpenFilePicker({types:[kind==="mappe"?{description:"Planungsmappe",accept:{"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":[".xlsx",".xlsm"]}}:{description:"Trainingsdatei",accept:{"application/json":[".json"]}}]});
+      FH[kind]=h;IDB.put("kv",h,"fh_"+kind);await readHandle(kind);}catch(e){if(e.name!=="AbortError")showErr(e);}
+  }else $("#in_"+kind).click();
+}
+async function readHandle(kind){const h=FH[kind];if(!h)return;
+  if(h.queryPermission&&(await h.queryPermission({mode:"read"}))!=="granted"){if((await h.requestPermission({mode:"read"}))!=="granted")throw new Error("Kein Lesezugriff auf "+h.name);}
+  await loadFile(kind,await h.getFile());}
+async function loadFile(kind,f,quiet){
+  try{
+    if(kind==="mappe"){if(!window.XLSX)throw new Error("Excel-Bibliothek nicht geladen (xlsx.bundle.js fehlt und CDN nicht erreichbar). Siehe Einrichtung.");
+      const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});WB={};
+      wb.SheetNames.forEach(n=>{WB[n]=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:false});});
+      WBNAME=f.name;WBTIME=f.lastModified;}
+    else{JS=JSON.parse(await f.text());JSNAME=f.name;}
+    dataChanged(!FOCUS_USER);if(!quiet)toast((kind==="mappe"?"Planungsmappe":"Trainingsdatei")+" geladen – nur lokal gelesen.");
+  }catch(e){showErr(e);}
+}
+function showErr(e){console.error(e);toast("Fehler: "+(e&&e.message||e),6000);}
+
+/* ---------- Tabellen-Helfer ---------- */
+const norm=s=>String(s??"").trim().toLowerCase();
+function rowsOf(name){if(!WB)return null;if(WB[name])return WB[name];const k=Object.keys(WB).find(n=>norm(n)===norm(name));return k?WB[k]:null;}
+function tbl(name,key){const rows=rowsOf(name);if(!rows)return null;let hr=-1;
+  for(let i=0;i<Math.min(rows.length,15);i++){const r=rows[i]||[];if(key?r.some(c=>norm(c)===norm(key)):r.filter(c=>typeof c==="string"&&c.trim()).length>=2){hr=i;break;}}
+  if(hr<0)return[];const H=rows[hr].map(h=>String(h??"").trim());
+  return rows.slice(hr+1).filter(r=>r&&r.some(c=>c!=null&&c!=="")).map(r=>{const o={};H.forEach((h,i)=>{if(h)o[h]=r[i];});return o;});}
+function g(o,...ns){for(const n of ns)if(o[n]!=null&&o[n]!=="")return o[n];
+  for(const n of ns){const k=Object.keys(o).find(k=>norm(k).startsWith(norm(n)));if(k&&o[k]!=null&&o[k]!=="")return o[k];}return null;}
+function groupWk(arr,...df){const m={};(arr||[]).forEach(o=>{const k=wkOf(g(o,...df));if(k)(m[k]=m[k]||[]).push(o);});return m;}
+const yes=v=>/^(ja|yes|true|1|x)$/i.test(String(v??"").trim());
+
+/* ============================================================
+   Zeitraum
+   ============================================================ */
+function lastDataDate(){let best=null;const up=d=>{if(d&&(!best||d>best))best=d;};
+  if(WB)["Sessions","Kraft-Sätze","Gewicht","Mobility-Verlauf","Sprung","Kraftmessung"].forEach(n=>{const t=tbl(n,"Datum");(t||[]).forEach(o=>up(parseD(g(o,"Datum"))));});
+  if(JS){(JS.training||[]).forEach(t=>up(parseD(t["start-time"])));(JS.recharge||[]).forEach(r=>up(parseD(r.date)));}
+  const t=todayUTC();return best&&best<t?best:t;}
+function defaultFocus(){const t=todayUTC(),wd=(t.getUTCDay()+6)%7;let f=wd>=4?monday(t):addD(monday(t),-7);const ld=monday(lastDataDate());if(ld<f)f=ld;return iso(f);}
+let FOCUS=null,FOCUS_USER=false;
+function weeksRange(){const f=parseD(FOCUS)||parseD(defaultFocus());const fm=monday(f);const out=[];for(let i=-ST.back;i<=ST.ahead;i++)out.push(iso(addD(fm,i*7)));return {all:out,focus:iso(fm),past:out.filter(w=>w<=iso(fm)),future:out.filter(w=>w>iso(fm))};}
+
+/* ============================================================
+   Dossier: verdichtet Mappe + Trainingsdatei zu Text
+   ============================================================ */
+const KNOWN=new Set(["Übersicht","Gesamt","Ziele","Klettern","Velo","Kickbox","Kraft","Makroplan","Makro-Phasen","Ausdauer-Plan","Load-Recovery","Balance","Phasen","Skala","Kraft-Übungen","Einstellungen",
+ "Tracking-Info","Sessions","Technik-Reflexion","Kraft-Einträge","Kraft-Sätze","Kraft-Katalog","Trainingsorte","Kraftmessung","Griff-Presets","Sprung","Gewicht","Tracking-Einstellungen","Ziele-Notizen","Wochen-Check",
+ "Mobility-Info","Mobility-Übungen","Mobility-Kategorien","Mobility-Workouts","Mobility-Erledigt","Assistance-Log","Mobility-Verlauf","Mobility-Presets","Mobility-Listen","Mobility-Einstellungen"]);
+const AREA_SHEETS=[["Klettern","Klettern"],["Velo","Velo"],["Kickbox","Kickbox"],["Ausdauer-Plan","Ausdauer gesamt"]];
+const SPORT_DE={INDOOR_CLIMBING:"Klettern (Halle)",ROCK_CLIMBING:"Klettern (Fels)",CLIMBING:"Klettern",ROAD_BIKING:"Velo",CYCLING:"Velo",INDOOR_CYCLING:"Velo (indoor)",MOUNTAIN_BIKING:"MTB",GRAVEL_CYCLING:"Gravel",KICKBOXING:"Kickbox",BOXING:"Boxen",MARTIAL_ARTS:"Kampfsport",STRENGTH_TRAINING:"Krafttraining",RUNNING:"Laufen",TRAIL_RUNNING:"Trail",HIKING:"Wandern",WALKING:"Gehen",SWIMMING:"Schwimmen",YOGA:"Yoga",OTHER_INDOOR:"Sonstiges indoor",OTHER_OUTDOOR:"Sonstiges outdoor"};
+const sportName=t=>{const k=t["detailed-sport-info"]||t.sport||"?";return SPORT_DE[k]||String(k).toLowerCase().replace(/_/g," ").replace(/^./,c=>c.toUpperCase());};
+
+const INC_LABEL={plan:"Planung & Phasen",polar:"Belastung (Polar)",erh:"Erholung (Schlaf, HRV)",sess:"Sessions",kraft:"Kraft",griff:"Griff / Fingerkraft",sprung:"Sprung",velo:"Velo-Leistung",mob:"Mobility",gew:"Körpergewicht",extra:"Weitere Blätter"};
+
+function buildDossier(){
+  const R=weeksRange(),W=R.all,inW=k=>k&&k>=W[0]&&k<=W[W.length-1],inPast=k=>k&&k>=W[0]&&k<=R.focus;
+  const first=parseD(W[0]),lastDay=addD(parseD(W[W.length-1]),6),focusEnd=addD(parseD(R.focus),6);
+  const S=[];const sec=(id,title,lines)=>{lines=lines.filter(x=>x!=null&&x!=="");if(lines.length)S.push({id,title,text:"## "+title+"\n"+lines.join("\n")});};
+  const head=["# Trainingsdossier",
+    "Erstellt: "+iso(todayUTC())+" · Quellen: "+[WBNAME,JSNAME].filter(Boolean).join(", "),
+    "Fokuswoche: "+wkL(R.focus)+" bis "+dm(focusEnd)+isoYear(focusEnd)+" · Rückblick "+ST.back+" Wo. · Ausblick "+ST.ahead+" Wo. (Zeitraum "+dm(first)+"–"+dm(lastDay)+isoYear(lastDay)+")",
+    "Inhalt: nur gemessene/erfasste Trainingsdaten und Planvorgaben – keine Reflexionen oder Freitext-Notizen.",
+    "Lesehilfe: „Plan→Ist“ = geplante Phase → rückblickend bewertete Phase. „?“ = noch nicht bewertet. Wochen nach der Fokuswoche sind reine Planung. Sessions-Intensität/-Volumen = subjektive Skala 1–5. „–“ = keine Daten."];
+  if(ST.profile&&ST.profile.trim())head.push("","## Athletenprofil (Selbstauskunft)",ST.profile.trim());
+  const I=ST.inc,C=isCompact();
+
+  /* ---------- Planung ---------- */
+  if(I.plan&&WB){const L=[];
+    const ph=tbl("Phasen","Name");if(ph&&ph.length)L.push("Phasen-Vokabular: "+ph.map(o=>g(o,"Name")).filter(Boolean).join(", "));
+    const sk=tbl("Skala","Stufe");const skMap={};if(sk&&sk.length){sk.forEach(o=>skMap[String(g(o,"Stufe"))]=g(o,"Bezeichnung"));L.push("Load:Recovery-Skala: "+sk.map(o=>g(o,"Stufe")+"="+g(o,"Bezeichnung")).join(", "));}
+    const mk=tbl("Makroplan","Bereich-Key");
+    if(mk&&mk.length){const lo=addD(first,-60),hi=addD(lastDay,90);const bl=mk.filter(o=>{const a=parseD(g(o,"Von")),b=parseD(g(o,"Bis"));return a&&b&&b>=lo&&a<=hi;});
+      if(bl.length){L.push("","### Makroplan (Blöcke je Bereich, Halbmonate)");const by={};bl.forEach(o=>{const k=g(o,"Bereich")||g(o,"Bereich-Key");(by[k]=by[k]||[]).push(o);});
+        Object.entries(by).forEach(([k,a])=>L.push("- "+k+": "+a.map(o=>dm(parseD(g(o,"Von")))+"–"+dm(parseD(g(o,"Bis")))+" "+g(o,"Phase")+(g(o,"Notiz")?" („"+cut(g(o,"Notiz"),80)+"“)":"")).join(" · ")));}}
+    const phLine=(lab,map)=>{const parts=W.map(w=>{const x=map[w];if(!x||(!x.p&&!x.i))return null;const fut=w>R.focus;return "KW"+isoWeek(w)+" "+(fut?(x.p||"?")+" (Plan)":(x.p||"–")+"→"+(x.i||"?"));}).filter(Boolean);return parts.length?"- "+lab+": "+parts.join(" · "):null;};
+    const notes=[],PH=[];
+    L.push("","### Wochenphasen Plan→Ist");
+    const ges=tbl("Gesamt","Woche (Montag)");
+    if(ges){const m={};ges.forEach(o=>{const w=wkOf(g(o,"Woche (Montag)"));if(inW(w)){m[w]={p:g(o,"Plan-Phase"),i:g(o,"Ist-Phase")};if(g(o,"Notiz"))notes.push([w,"Gesamt",g(o,"Notiz")]);}});PH.push({lab:"Gesamt",map:m});}
+    const areaLines=(t,label)=>{const mv={},mi={};t.forEach(o=>{const w=wkOf(g(o,"Woche (Montag)"));if(!inW(w))return;mv[w]={p:g(o,"Vol Plan-Phase"),i:g(o,"Vol Ist-Phase")};mi[w]={p:g(o,"Int Plan-Phase"),i:g(o,"Int Ist-Phase")};
+        if(g(o,"Vol Notiz"))notes.push([w,label+" Vol",g(o,"Vol Notiz")]);if(g(o,"Int Notiz"))notes.push([w,label+" Int",g(o,"Int Notiz")]);});
+      PH.push({lab:label+" Vol",map:mv},{lab:label+" Int",map:mi});};
+    AREA_SHEETS.forEach(([n,lab])=>{const t=tbl(n,"Woche (Montag)");if(t&&t.length)areaLines(t,lab);});
+    const kr=tbl("Kraft","Kategorie");if(kr&&kr.length){const by={};kr.forEach(o=>{const c=g(o,"Kategorie");if(c)(by[c]=by[c]||[]).push(o);});Object.entries(by).forEach(([c,a])=>areaLines(a,/^kraft/i.test(c)?c:"Kraft "+c));}
+    if(!C)PH.forEach(x=>L.push(phLine(x.lab.replace(/ Vol$/," Volumen").replace(/ Int$/," Intensität"),x.map)));
+    else{const G=PH.find(x=>x.lab==="Gesamt"),A=PH.filter(x=>x.lab!=="Gesamt");
+      W.forEach(w=>{const gx=G&&G.map[w];const fut=w>R.focus;
+        if(!fut){const dev=A.filter(x=>{const y=x.map[w];return y&&y.p&&y.i&&y.p!==y.i;}).map(x=>x.lab+" "+x.map[w].p+"→"+x.map[w].i);const open=A.some(x=>{const y=x.map[w];return y&&y.p&&!y.i;});
+          L.push("- KW"+isoWeek(w)+": Gesamt "+(gx?(gx.p||"–")+"→"+(gx.i||"?"):"–")+(dev.length?"; abweichend: "+dev.join(", "):open?"; Bereiche noch nicht bewertet":"; Bereiche wie geplant"));}
+        else{const cnt={};A.forEach(x=>{const y=x.map[w];if(y&&y.p)cnt[y.p]=(cnt[y.p]||0)+1;});const top=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];
+          const ex=A.filter(x=>{const y=x.map[w];return y&&y.p&&y.p!==top;}).map(x=>x.lab+" "+x.map[w].p);
+          L.push("- KW"+isoWeek(w)+" (Plan): Gesamt "+(gx&&gx.p||"–")+(top?"; Bereiche "+top+(ex.length?", außer "+ex.join(", "):""):""));}});}
+    const zi=tbl("Ziele","Woche (Montag)");
+    if(zi&&zi.length){const fut=zi.filter(o=>{const w=wkOf(g(o,"Woche (Montag)"));return w&&w>=R.focus&&inW(w)&&g(o,"Notiz");});
+      fut.forEach(o=>{const w=wkOf(g(o,"Woche (Montag)"));const lab=g(o,"Bereich")+(g(o,"Dimension")&&g(o,"Dimension")!==g(o,"Bereich")?" "+g(o,"Dimension"):"");if(!notes.some(n=>n[0]===w&&n[2]===g(o,"Notiz")))notes.push([w,lab,g(o,"Notiz")]);});}
+    if(C){const keep=notes.filter(n=>n[0]>=R.focus);notes.length=0;notes.push(...keep);}
+    if(notes.length){L.push("","### Planungsnotizen"+(C?" (ab Fokuswoche)":""));const nm=new Map();notes.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0).forEach(n=>{const k=n[1]+"\u0000"+n[2];if(!nm.has(k))nm.set(k,{lab:n[1],t:n[2],w:[]});nm.get(k).w.push(n[0]);});
+      [...nm.values()].sort((a,b)=>a.w[0]<b.w[0]?-1:a.w[0]>b.w[0]?1:0).slice(0,C?10:999).forEach(x=>L.push("- "+x.w.map(w=>"KW"+isoWeek(w)).join(", ")+" "+x.lab+": "+cut(x.t,C?90:160)));}
+    const bal=tbl("Balance","Woche (Montag)");
+    if(bal&&bal.length){const p=bal.filter(o=>inW(wkOf(g(o,"Woche (Montag)")))).map(o=>{const u=g(o,"Urteil");return "KW"+isoWeek(wkOf(g(o,"Woche (Montag)")))+" "+(skMap[String(u)]||u);});if(p.length)L.push("","Load:Recovery-Urteil (eigene Einschätzung je Woche): "+p.join(" · "));}
+    const lr=rowsOf("Load-Recovery");
+    if(lr&&lr.length>3){const t=tbl("Load-Recovery","Signal");const title=(lr[0]||[])[0];
+      if(t&&t.length&&!C){L.push("","### Recovery-Signale (Snapshot aus der Planung"+(title?": "+String(title).replace(/^Recovery\s*—\s*/,""):"")+")");
+        t.forEach(o=>{const s=g(o,"Signal");if(!s||g(o,"jetzt")==null)return;L.push("- "+s+": "+f1(num(g(o,"jetzt")))+" "+(g(o,"Einheit")||"")+" · Δ Vorwoche "+f1(num(g(o,"Δ Vorw")))+" · Δ4 "+f1(num(g(o,"Δ4")))+" · Δ12 "+f1(num(g(o,"Δ12"))));});}}
+    sec("plan","Planung",L);
+  }
+
+  /* ---------- Polar: Belastung ---------- */
+  const tr=(JS&&JS.training)||[];
+  if(I.polar&&tr.length){const L=[];const day={};let minD=null;
+    tr.forEach(t=>{const d=dayOf(t["start-time"]);if(!d)return;const cl=num(t["training-load-pro"]&&t["training-load-pro"]["cardio-load"]);day[d]=(day[d]||0)+(cl||0);if(!minD||d<minD)minD=d;});
+    const byW=groupWk(tr,"start-time");
+    L.push("Je Woche: Einheiten, Dauer, Cardio-Load (Polar TRIMP-basiert), Ø HF; Monotonie = Ø/SD der Tages-Loads (Foster); ACWR = 7-Tage-Summe / (28-Tage-Summe/4), nur deskriptiv.");
+    W.filter(w=>w<=R.focus).forEach(w=>{const a=byW[w]||[];if(!a.length){L.push("- "+wkL(w)+": keine Polar-Einheiten");return;}
+      const dur=sum(a.map(t=>isoDur(t.duration))),cl=sum(a.map(t=>num(t["training-load-pro"]&&t["training-load-pro"]["cardio-load"]))),ml=sum(a.map(t=>num(t["training-load-pro"]&&t["training-load-pro"]["muscle-load"])));
+      const hrW=sum(a.map(t=>(num(t["heart-rate"]&&t["heart-rate"].average)||0)*(isoDur(t.duration)||0)))/Math.max(1,sum(a.map(t=>t["heart-rate"]&&t["heart-rate"].average?isoDur(t.duration):0)));
+      const sp={};a.forEach(t=>{const n=sportName(t);sp[n]=sp[n]||{n:0,d:0,c:0};sp[n].n++;sp[n].d+=isoDur(t.duration)||0;sp[n].c+=num(t["training-load-pro"]&&t["training-load-pro"]["cardio-load"])||0;});
+      const dl=[];for(let i=0;i<7;i++)dl.push(day[iso(addD(parseD(w),i))]||0);const mono=sd(dl)?avg(dl)/sd(dl):null;
+      const sun=addD(parseD(w),6);let acwr=null;if(minD&&parseD(minD)<=addD(sun,-27)){let a7=0,a28=0;for(let i=0;i<28;i++){const v=day[iso(addD(sun,-i))]||0;a28+=v;if(i<7)a7+=v;}acwr=a28?a7/(a28/4):null;}
+      L.push("- "+wkL(w)+": "+a.length+" Einheiten, "+hm(dur)+", Cardio-Load "+f0(cl)+(ml?", Muscle-Load "+f0(ml):"")+", Ø HF "+f0(hrW)+" · Monotonie "+f1(mono)+" · ACWR "+f2(acwr)+(C&&w!==R.focus?"":" | "+Object.entries(sp).map(([n,x])=>n+" "+x.n+"× "+hm(x.d)+" CL "+f0(x.c)).join(", ")));});
+    const fw=byW[R.focus]||[];if(fw.length&&!C)L.push("Einheiten Fokuswoche: "+fw.slice().sort((a,b)=>String(a["start-time"]).localeCompare(String(b["start-time"]))).map(t=>{const d=parseD(t["start-time"]);return WD[(d.getUTCDay()+6)%7]+" "+sportName(t)+" "+hm(isoDur(t.duration))+" Ø"+f0(num(t["heart-rate"]&&t["heart-rate"].average))+"/max"+f0(num(t["heart-rate"]&&t["heart-rate"].maximum))+" CL "+f0(num(t["training-load-pro"]&&t["training-load-pro"]["cardio-load"]));}).join("; "));
+    sec("polar","Belastung laut Polar",L);
+  }
+
+  /* ---------- Erholung ---------- */
+  const sl=(JS&&JS.sleep)||[],rc=(JS&&JS.recharge)||[];
+  if(I.erh&&(sl.length||rc.length)){const L=[];const slW=groupWk(sl,"date"),rcW=groupWk(rc,"date");
+    const base=(arr,key,w)=>{const lo=addD(parseD(w),-28),hi=parseD(w);return avg(arr.filter(r=>{const d=parseD(r.date);return d&&d>=lo&&d<hi;}).map(r=>num(r[key])));};
+    L.push("Nachtwerte Polar (Nightly Recharge). Basis = Ø der 28 Tage vor der Woche. HRV = Polar-Nachtmittel (ms, kein ln rMSSD am Morgen).");
+    W.filter(w=>w<=R.focus).forEach(w=>{const s=slW[w]||[],r=rcW[w]||[];if(!s.length&&!r.length){L.push("- "+wkL(w)+": keine Daten");return;}
+      const dur=avg(s.map(x=>(num(x.light_sleep)||0)+(num(x.deep_sleep)||0)+(num(x.rem_sleep)||0)||null));const hrv=avg(r.map(x=>num(x.heart_rate_variability_avg))),hr=avg(r.map(x=>num(x.heart_rate_avg)));
+      const bh=base(rc,"heart_rate_variability_avg",w),bhr=base(rc,"heart_rate_avg",w);
+      const p=[];if(s.length)p.push("Schlaf Ø "+hm(dur)+" (Score "+f0(avg(s.map(x=>num(x.sleep_score))))+", Sleep Charge "+f1(avg(s.map(x=>num(x.sleep_charge))))+", n="+s.length+")");
+      if(r.length)p.push("HRV Ø "+f0(hrv)+" ms"+(bh?" ("+sgn(pct(hrv,bh))+" % vs. Basis "+f0(bh)+")":"")+", Ruhe-HF Ø "+f1(hr)+(bhr?" ("+(hr-bhr>=0?"+":"")+f1(hr-bhr)+" vs. Basis)":"")+", ANS-Charge Ø "+f1(avg(r.map(x=>num(x.ans_charge))))+(C?"":", Atmung "+f1(avg(r.map(x=>num(x.breathing_rate_avg))))+", HRV-Schwankung (CV) "+f0(sd(r.map(x=>num(x.heart_rate_variability_avg)))/hrv*100)+" %"));
+      L.push("- "+wkL(w)+": "+p.join(" · "));});
+    const fr=(rcW[R.focus]||[]).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    if(fr.length)L.push("Tageswerte Fokuswoche (HRV/Ruhe-HF): "+fr.map(x=>{const d=parseD(x.date);return WD[(d.getUTCDay()+6)%7]+" "+f0(num(x.heart_rate_variability_avg))+"/"+f0(num(x.heart_rate_avg));}).join(", "));
+    sec("erh","Erholung",L);
+  }
+
+  /* ---------- Sessions (Tracking) ---------- */
+  const ses=WB&&tbl("Sessions","Datum");
+  if(I.sess&&ses&&ses.length){const L=["Je Woche und Sportart: Anzahl, Ø Intensität / Ø Volumen (subjektiv 1–5)."];const by=groupWk(ses,"Datum");
+    W.filter(w=>w<=R.focus).forEach(w=>{const a=by[w]||[];if(!a.length){L.push("- "+wkL(w)+": keine Sessions");return;}const sp={};a.forEach(o=>{const s=g(o,"Sportart")||"?";(sp[s]=sp[s]||[]).push(o);});
+      L.push("- "+wkL(w)+": "+Object.entries(sp).map(([s,x])=>{const tags=[...new Set(x.flatMap(o=>String(g(o,"Fokus-Tags")||"").split(/[;,]/).map(t=>t.trim()).filter(Boolean)))];return s+" "+x.length+"× (I "+f1(avg(x.map(o=>num(g(o,"Intensität")))))+", V "+f1(avg(x.map(o=>num(g(o,"Volumen")))))+")";}).join("; "));});
+    const wc=tbl("Wochen-Check","Woche (Montag)");
+    if(wc&&wc.length){const p=wc.filter(o=>inPast(wkOf(g(o,"Woche (Montag)")))).map(o=>"KW"+isoWeek(wkOf(g(o,"Woche (Montag)")))+" "+g(o,"Bereich")+": "+g(o,"Status"));if(p.length)L.push("Wochen-Check: "+p.join(" · "));}
+    sec("sess","Trainingseinheiten (eigene Erfassung)",L);
+  }
+
+  /* ---------- Kraft ---------- */
+  const ks=WB&&tbl("Kraft-Sätze","Datum");
+  if(I.kraft&&ks&&ks.length){const L=[];const kat=tbl("Kraft-Katalog","Übung")||[];const ke=tbl("Kraft-Einträge","Eintrag-ID")||[];
+    const bwE={};ke.forEach(o=>{bwE[g(o,"Eintrag-ID")]=num(g(o,"Körpergewicht"));});
+    const gw=tbl("Gewicht","Datum")||[];const defBW=avg(gw.slice(-14).map(o=>num(g(o,"Gewicht"))))||75;
+    const load=o=>{const lt=norm(g(o,"Lasttyp")),kg=num(g(o,"kg")),z=num(g(o,"Zusatz-kg"))||0;if(lt.startsWith("körper")){const bw=bwE[g(o,"Eintrag-ID")]||defBW;const f=(num(g(o,"KG-Faktor"))??100)/100;return bw*f+z+(kg||0);}return kg!=null?kg+z:null;};
+    const by=groupWk(ks,"Datum");
+    L.push("Je Woche: Einheiten, Sätze, Tonnage (Last×Wdh; Körpergewicht anteilig nach KG-Faktor), Ø RIR, Sätze je Kategorie.");
+    W.filter(w=>w<=R.focus).forEach(w=>{const a=by[w]||[];if(!a.length){L.push("- "+wkL(w)+": kein Krafttraining erfasst");return;}
+      const sess=new Set(a.map(o=>g(o,"Eintrag-ID")||dayOf(g(o,"Datum")))).size;let ton=0;const cat={};
+      a.forEach(o=>{const c=g(o,"Kategorie")||"?";cat[c]=cat[c]||{n:0,t:0};cat[c].n++;const l=load(o),r=num(g(o,"Wdh"));if(l!=null&&r!=null){ton+=l*r;cat[c].t+=l*r;}});
+      L.push("- "+wkL(w)+": "+sess+" Einheit(en), "+a.length+" Sätze, Tonnage "+f1(ton/1000)+" t, Ø RIR "+f1(avg(a.map(o=>rangeNum(g(o,"RIR")))))+(C?"":" | "+Object.entries(cat).map(([c,x])=>c+" "+x.n+" S"+(x.t?" "+f1(x.t/1000)+" t":"")).join(", ")));});
+    const ex={};ks.forEach(o=>{const w=wkOf(g(o,"Datum"));if(!inPast(w))return;const n=g(o,"Übung");if(!n)return;(ex[n]=ex[n]||{}),(ex[n][w]=ex[n][w]||[]).push(o);});
+    const focusEx=new Set(kat.filter(o=>yes(g(o,"Fokus"))).map(o=>g(o,"Übung")));
+    const names=Object.keys(ex).sort((a,b)=>(focusEx.has(b)-focusEx.has(a))||(Object.values(ex[b]).flat().length-Object.values(ex[a]).flat().length)).slice(0,C?4:10);
+    if(names.length){L.push("","### Übungsverlauf (bester Satz je Woche)");
+      names.forEach(n=>{let wks=Object.keys(ex[n]).sort();if(C&&wks.length>2)wks=[wks[0],wks[wks.length-1]];const parts=wks.map(w=>{const a=ex[n][w];const lt=norm(g(a[0],"Lasttyp"));let best;
+          if(lt.startsWith("halt")||a.some(o=>num(g(o,"Sek")))){best=a.reduce((b,o)=>{const s=num(g(o,"Sek"))||0,k=load(o)||0;return !b||k>b.k||(k===b.k&&s>b.s)?{k,s,z:num(g(o,"Zusatz-kg"))}:b;},null);return "KW"+isoWeek(w)+" "+(best.z?"+"+f1(best.z)+" kg ":"")+f0(best.s)+" s ("+a.length+" S)";}
+          best=a.reduce((b,o)=>{const l=load(o),r=num(g(o,"Wdh"));if(l==null||r==null)return b;const e=l*(1+r/30);return !b||e>b.e?{e,l,r,z:num(g(o,"Zusatz-kg")),kg:num(g(o,"kg"))}:b;},null);
+          if(!best)return "KW"+isoWeek(w)+" "+a.length+" S";
+          const kgx=lt.startsWith("körper");return "KW"+isoWeek(w)+" "+(kgx?"KG"+(best.z?"+"+f1(best.z):"")+"×"+best.r:f1(best.kg)+"×"+best.r)+" ("+(kgx?"":"e1RM≈"+f0(best.e)+", ")+"RIR "+(g(a[0],"RIR")||"–")+", "+a.length+" S)";});
+        const k=kat.find(o=>g(o,"Übung")===n);L.push("- "+n+(k?" ["+[g(k,"Kategorie"),focusEx.has(n)?"Fokus":null,g(k,"Unilateral")&&yes(g(k,"Unilateral"))?"unilateral":null].filter(Boolean).join(", ")+"]":"")+": "+parts.join(" · ")+(k&&g(k,"Getestete 1RM")?" | getestet: "+g(k,"Getestete 1RM"):""));});
+      L.push("(e1RM nach Epley, nur Orientierung. KG = Körpergewicht, +x = Zusatzlast.)");}
+    sec("kraft","Krafttraining",L);
+  }
+
+  /* ---------- Griff / Fingerkraft ---------- */
+  if(I.griff){const L=[];const km=WB&&tbl("Kraftmessung","Datum");
+    if(km&&km.length){const a=km.filter(o=>{const d=parseD(g(o,"Datum"));return d&&d>=addD(first,-28)&&d<=focusEnd;});
+      if(a.length)L.push("Griffkraft-Messungen (Dynamometer): "+a.slice(C?-3:0).map(o=>dm(parseD(g(o,"Datum")))+" L "+f1(num(g(o,"Griff L")))+" / R "+f1(num(g(o,"Griff R")))+" kg, LSI "+f0(num(g(o,"Griff LSI")))+" %"+(g(o,"Phase")?" ("+g(o,"Phase")+")":"")).join(" · "));}
+    const gt=WB&&tbl("Griff-Training","Datum");
+    if(gt&&gt.length){const by=groupWk(gt,"Datum");const p=W.filter(w=>w<=R.focus&&by[w]).map(w=>{const a=by[w];const kinds={};a.forEach(o=>{const k=(g(o,"Art")||"Training")+(g(o,"Hand / Ausführung")?" "+g(o,"Hand / Ausführung"):"");kinds[k]=(kinds[k]||0)+1;});return wkL(w)+": "+a.length+" Einträge ("+Object.entries(kinds).map(([k,n])=>n+"× "+k).join(", ")+")";});if(p.length)L.push("Griff-Training (Tracking): "+p.join(" · "));}
+    const gs=JS&&JS.grip&&JS.grip.sessions||[];
+    if(gs.length){const by=groupWk(gs,"date");const gw0=W.filter(w=>w<=R.focus&&by[w]);(C&&gw0.length>2?[gw0[0],gw0[gw0.length-1]]:gw0).forEach(w=>{const a=by[w];if(!a)return;
+      L.push("- "+wkL(w)+" Hangboard/Griffgerät: "+a.length+" Sessions ("+[...new Set(a.map(o=>o.program))].join(", ")+"), Peak max "+f1(Math.max(...vals(a.map(o=>num(o.peak_kg)))))+" kg, Ø Last "+f1(avg(a.map(o=>num(o.mean_load_kg))))+" kg, Volumen "+f0(sum(a.map(o=>num(o.volume_kg_s))))+" kg·s, Ø %MVC "+f0(avg(a.map(o=>num(o.intensity_pct_mvc))))+", TUT "+f0(sum(a.map(o=>num(o.total_tut_s))))+" s");});}
+    sec("griff","Griff & Fingerkraft",L);
+  }
+
+  /* ---------- Sprung ---------- */
+  if(I.sprung){const L=[];let rows=[];const sp=WB&&tbl("Sprung","Datum");
+    if(sp&&sp.length)rows=sp.map(o=>({d:dayOf(g(o,"Datum")),leg:norm(g(o,"Bein")),drill:g(o,"Drill")||"?",hb:num(g(o,"Höhe best")),ha:num(g(o,"Höhe Ø")),rsi:num(g(o,"RSI best")),pp:num(g(o,"Peak Power"))}));
+    else if(JS&&JS.sprung&&JS.sprung.rows&&JS.sprung.rows.length>1){const H=JS.sprung.rows[0].map(String);const ix=n=>H.findIndex(h=>norm(h).startsWith(norm(n)));let cur=null;const grp=[];
+      JS.sprung.rows.slice(1).forEach(r=>{if(r[ix("Timestamp")]){cur={d:dayOf(r[ix("Timestamp")]),name:norm(r[ix("Name")]),drill:r[ix("Drill")]||"?",h:[],rsi:[],pp:[]};grp.push(cur);}if(!cur)return;const h=num(r[ix("Jump Height")]);if(h!=null)cur.h.push(h/10);const rs=num(r[ix("RSI")]);if(rs!=null)cur.rsi.push(rs);const p=num(r[ix("Peak power")]);if(p!=null)cur.pp.push(p);});
+      rows=grp.map(x=>({d:x.d,leg:/left|links/.test(x.name)?"links":/right|rechts/.test(x.name)?"rechts":"beidbeinig",drill:x.drill,hb:x.h.length?Math.max(...x.h):null,ha:avg(x.h),rsi:x.rsi.length?Math.max(...x.rsi):null,pp:x.pp.length?Math.max(...x.pp):null}));}
+    rows=rows.filter(r=>r.d&&r.d>=iso(addD(first,-14))&&r.d<=iso(focusEnd));
+    if(C)rows=rows.filter(r=>[...new Set(rows.map(x=>x.d))].sort().slice(-3).includes(r.d));
+    if(rows.length){const by={};rows.forEach(r=>{const k=r.d+"|"+r.drill;(by[k]=by[k]||[]).push(r);});
+      L.push("Sprungtests je Tag (Höhe cm best/Ø, RSI best, Peak Power W; LSI = schwächeres/stärkeres Bein):");
+      Object.keys(by).sort().forEach(k=>{const a=by[k],[d,drill]=k.split("|");const bi=a.find(r=>r.leg.startsWith("beid")),l=a.find(r=>r.leg.startsWith("l")),r=a.find(r=>r.leg.startsWith("r"));
+        const p=[];if(bi)p.push("beidbeinig "+f1(bi.hb)+"/"+f1(bi.ha)+" cm, RSI "+f2(bi.rsi)+", PP "+f0(bi.pp));if(l&&r){p.push("L "+f1(l.hb)+" / R "+f1(r.hb)+" cm, LSI "+f0(Math.min(l.hb,r.hb)/Math.max(l.hb,r.hb)*100)+" %");}
+        if(p.length)L.push("- "+dm(parseD(d))+" "+drill+": "+p.join(" · "));});}
+    sec("sprung","Sprung (neuromuskulär)",L);
+  }
+
+  /* ---------- Velo-Leistung ---------- */
+  const pw=(JS&&JS.power)||[];
+  if(I.velo&&pw.length){const L=[];const day={};let minD=null;pw.forEach(p=>{const d=dayOf(p.start);if(!d)return;day[d]=(day[d]||0)+(num(p.tss)||0);if(!minD||d<minD)minD=d;});
+    let ctl=0,atl=0;const at={};if(minD){for(let d=parseD(minD);d<=focusEnd;d=addD(d,1)){const t=day[iso(d)]||0;ctl+=(t-ctl)/42;atl+=(t-atl)/7;at[iso(d)]={ctl,atl};}}
+    const by=groupWk(pw,"start");L.push("Powermeter je Woche: Fahrten, TSS, Ø IF, NP max, Arbeit; Zeit in Zonen Z1–Z5 (% der Zeit); CTL/ATL/TSB am Wochenende (Coggan-Modell, Start bei 0 → erste Wochen unterschätzt). FTP laut Gerät: "+[...new Set(pw.map(p=>p.ftp_w).filter(Boolean))].join("/")+" W.");
+    W.filter(w=>w<=R.focus).forEach(w=>{const a=by[w]||[];const s=at[iso(addD(parseD(w),6))];const z=[0,0,0,0,0];a.forEach(p=>(p.time_in_zone_s||[]).forEach((v,i)=>{if(i<5)z[i]+=num(v)||0;}));const zt=sum(z);
+      L.push("- "+wkL(w)+": "+(a.length?a.length+" Fahrten, TSS "+f0(sum(a.map(p=>num(p.tss))))+", Ø IF "+f2(avg(a.map(p=>num(p.intensity_factor))))+", NP max "+f0(Math.max(...vals(a.map(p=>num(p.np_w)))))+" W, "+f0(sum(a.map(p=>num(p.work_kj))))+" kJ, "+hm(sum(a.map(p=>num(p.moving_s))))+(zt?", Zonen "+z.map(v=>f0(v/zt*100)).join("/")+" %":""):"keine Fahrten")+(s?" · CTL "+f0(s.ctl)+" ATL "+f0(s.atl)+" TSB "+sgn(s.ctl-s.atl):""));});
+    sec("velo","Velo-Leistung",L);
+  }
+
+  /* ---------- Mobility ---------- */
+  if(I.mob&&WB){const L=[];const mv=tbl("Mobility-Verlauf","Datum"),me=tbl("Mobility-Erledigt","Datum"),al=tbl("Assistance-Log","Datum"),mu=tbl("Mobility-Übungen","Name");
+    const bv=groupWk(mv||[],"Datum"),be=groupWk(me||[],"Datum"),ba=groupWk(al||[],"Datum");
+    if((mv&&mv.length)||(me&&me.length)||(al&&al.length)){
+      W.filter(w=>w<=R.focus).forEach(w=>{const v=bv[w]||[],e=be[w]||[],a=ba[w]||[];if(!v.length&&!e.length&&!a.length){L.push("- "+wkL(w)+": nichts erfasst");return;}
+        const gel=[...new Set(v.flatMap(o=>String(g(o,"Gelenke")||"").split(";").map(s=>s.trim()).filter(Boolean)))];
+        L.push("- "+wkL(w)+": "+new Set(v.map(o=>dayOf(g(o,"Datum")))).size+" Mobility-Tage, "+e.length+" Übungen erledigt"+(gel.length?" ("+gel.join(", ")+")":"")+(a.length?" · Assistance "+a.length+"× (Ø V "+f1(avg(a.map(o=>num(g(o,"Volumen")))))+", Ø I "+f1(avg(a.map(o=>num(g(o,"Intensität")))))+(C?"":": "+[...new Set(a.map(o=>g(o,"Übung")))].slice(0,5).join(", "))+")":""));});}
+    if(mu&&mu.length){const act=mu.filter(o=>norm(g(o,"Status"))!=="pausiert"),pau=mu.filter(o=>norm(g(o,"Status"))==="pausiert");
+      L.push("Programm: "+act.length+" aktive Übungen"+(pau.length?", pausiert: "+pau.map(o=>g(o,"Name")).join(", "):""));}
+    sec("mob","Mobility & Assistance",L);
+  }
+
+  /* ---------- Gewicht ---------- */
+  if(I.gew&&WB){const gw=tbl("Gewicht","Datum");if(gw&&gw.length){const by=groupWk(gw,"Datum");const p=W.filter(w=>w<=R.focus&&by[w]).map(w=>{const a=vals(by[w].map(o=>num(g(o,"Gewicht"))));return "KW"+isoWeek(w)+" Ø "+f1(avg(a))+" ("+f1(Math.min(...a))+"–"+f1(Math.max(...a))+", n="+a.length+")";});
+    if(p.length)sec("gew","Körpergewicht (kg, Wochenmittel)",[(C&&p.length>3?[p[0],"…",p[p.length-2],p[p.length-1]]:p).join(" · ")]);}}
+
+  /* ---------- Weitere Blätter ---------- */
+  if(I.extra&&WB&&!C){const L=[];Object.keys(WB).filter(n=>!KNOWN.has(n)&&!(n==="Griff-Training")).forEach(n=>{
+      if((n==="Ausdauer"||n==="Velo-Leistung")&&tr.length)return;const rows=WB[n];if(!rows||rows.length<2)return;
+      let hr=rows.findIndex(r=>r&&r.filter(c=>typeof c==="string"&&c.trim()).length>=2);if(hr<0)return;const keepC=rows[hr].map((h,i)=>/notiz|kommentar|antwort|frage|reflex|beschreibung|cue|link|tags/i.test(String(h||""))?-1:i).filter(i=>i>=0);const H=keepC.map(i=>rows[hr][i]);const di0=H.findIndex(h=>/datum|woche|date/i.test(String(h||"")));if(di0<0)return;const di=keepC[di0];
+      const rr=rows.slice(hr+1).filter(r=>{const d=parseD(r&&r[di]);return d&&d>=first&&d<=lastDay;});if(!rr.length)return;
+      L.push("### "+n,H.map(h=>cut(h,28)).join(" | "));rr.slice(-14).forEach(r=>L.push(H.map((h,j)=>{const v=r[keepC[j]];return v instanceof Date?iso(parseD(v)):cut(typeof v==="number"?f2(v):v,40);}).join(" | ")));});
+    sec("extra","Weitere Blätter (Rohdaten, gekürzt)",L);}
+
+  const text=head.join("\n")+"\n\n"+S.map(s=>s.text).join("\n\n");
+  return {text,sections:S,range:R};
+}
+function isoYear(d){return String(d.getUTCFullYear());}
+
+/* ============================================================
+   Wissensbasis & Prompts
+   ============================================================ */
+const PERSP=[
+ {id:"tw",lab:"Trainingswissenschaft",txt:"Trainingswissenschaft / Periodisierung: Passt die Abfolge der Phasen (Progressiv, Erhalt, Deload, Peak …) zu den Zielen? Stimmen Plan und Ist überein, und wenn nicht – ist die Abweichung sinnvoll (Autoregulation) oder ein Muster? Wie gut sind die Bereiche (Klettern, Velo, Kickbox, Kraft) aufeinander abgestimmt (Interferenz, Ermüdungsübertrag)?"},
+ {id:"load",lab:"Belastung & Erholung",txt:"Belastungssteuerung & Erholung: Verhältnis von externer/interner Last zu Erholungsmarkern (HRV, Ruhe-HF, Schlaf, Sprung). Gibt es Hinweise auf funktionelles/nicht-funktionelles Overreaching, Monotonie, abrupte Lastsprünge? Ist Deload-Timing angemessen?"},
+ {id:"aus",lab:"Ausdauerphysiologie",txt:"Ausdauerphysiologie: Intensitätsverteilung (Zonen, polarisiert/pyramidal), Umfangsentwicklung, CTL/ATL/TSB, Qualität der Schwelleneinheiten, Bezug zu den Ausdauerzielen."},
+ {id:"kraft",lab:"Kraft & Athletik",txt:"Kraft & Athletik: Volumen je Kategorie, Intensität/RIR, Progression der Hauptübungen, Balance Zug/Druck/Beine, Unilateralität, Schnellkraft (Sprung) und deren Ermüdungsanfälligkeit."},
+ {id:"klet",lab:"Klettern & Finger",txt:"Klettern & Fingerkraft: Belastung der Finger/Ringbänder (Hangboard + Klettern + Griffkraft), Progressionsgeschwindigkeit, Asymmetrien, Verhältnis von Kraft zu Technik-/Kletterumfang."},
+ {id:"kampf",lab:"Kampfsport",txt:"Kampfsport (Kickbox): Intermittierende Hochintensität, Technik unter Ermüdung, Einbettung in die Wochenstruktur, Erholungsbedarf nach Sparring."},
+ {id:"advo",lab:"Advocatus Diaboli",txt:"Advocatus Diaboli: Hinterfrage die Annahmen des Plans und die Selbsteinschätzungen kritisch. Wo könnte sich die Person etwas schönreden? Welche Alternative wäre ebenso plausibel? Sei respektvoll, aber unbequem."}];
+
+const KB=`Wissensanker (kuratiert; nutze sie als Referenzrahmen, nicht als Zwang. Autor/Jahr nur übernehmen, wenn sie hier stehen oder du dir wirklich sicher bist):
+- Belastung–Beanspruchung, Fitness-Ermüdungs-Modell: Leistung ≈ Fitness − Ermüdung mit unterschiedlichen Zeitkonstanten (Banister et al., 1975). Grundlage für CTL/ATL/TSB (Coggan; Allen & Coggan, „Training and Racing with a Power Meter“).
+- Periodisierung: Periodisierte Programme sind nicht-periodisierten für Maximalkraft meist überlegen; zwischen Periodisierungsmodellen (linear, wellenförmig, Block) gibt es kaum belastbare Unterschiede (Metaanalysen, u. a. Williams et al., 2017; Moesgaard et al., 2022). Blockperiodisierung: Issurin (2010). → Konsistenz und Belastungsmanagement wichtiger als das Modell.
+- Intensitätsverteilung Ausdauer: Erfolgreiche Ausdauerathleten trainieren überwiegend niedrigintensiv (~75–80 % der Einheiten), Rest hoch; polarisiert und pyramidal beide gut belegt (Seiler & Kjerland, 2006; Seiler, 2010; Stöggl & Sperlich, 2014). Zu viel „mittlere“ Intensität ist ein häufiges Muster bei Freizeitsportlern.
+- Concurrent Training: Interferenz v. a. bei hohem Ausdauerumfang/-frequenz und für Schnellkraft/Hypertrophie relevanter als für Maximalkraft (Wilson et al., 2012; Schumann et al., 2022). Abstand und Reihenfolge der Einheiten sowie Ausdauermodalität (Rad < Laufen) moderieren.
+- Krafttraining: Dosis-Wirkung für Hypertrophie – mehr Wochensätze je Muskelgruppe bis ca. 10+ wirksamer (Schoenfeld et al., 2017). Autoregulation über RIR/RPE (Zourdos et al., 2016; Helms et al., 2016) verbessert Passung an Tagesform. e1RM-Formeln (Epley) ungenau bei >10 Wdh.
+- Sitzungs-RPE und Monotonie: sRPE (Foster et al., 2001) als valide interne Last; hohe Monotonie (>2) bei hoher Last als Warnsignal beschrieben (Foster, 1998).
+- ACWR: Ursprünglich mit Verletzungsrisiko assoziiert (Gabbett, 2016), aber methodisch stark kritisiert (mathematische Kopplung, Ratio-Artefakte; Impellizzeri et al., 2020). → Nur als deskriptives Signal für abrupte Laständerungen, nicht als Risikovorhersage.
+- HRV-gesteuertes Training: Trends (7-Tage-Mittel vs. individuelle Basis, Variationskoeffizient) aussagekräftiger als Einzelwerte (Plews et al., 2013); HRV-gesteuerte Planung zeigt teils leicht bessere Ergebnisse als fixe Pläne (Kiviniemi et al., 2007). Sinkende HRV + steigende Ruhe-HF über mehrere Tage = Hinweis auf unvollständige Erholung (aber auch Stress, Krankheit, Alkohol, Hitze).
+- Übertraining: Kontinuum funktionelles Overreaching → nicht-funktionelles Overreaching → Übertrainingssyndrom; Diagnose nur per Ausschluss, kein einzelner Marker (Meeusen et al., 2013, ECSS/ACSM-Konsens).
+- Schlaf: Schlafmangel beeinträchtigt Leistung, Kognition, Erholung; Schlafverlängerung verbesserte Leistung (Mah et al., 2011); Übersicht: Fullagar et al. (2015).
+- Tapering: Ca. 2 Wochen, Umfang um ~40–60 % reduzieren, Intensität und Frequenz weitgehend halten (Bosquet et al., 2007, Metaanalyse).
+- Deload: In der Praxis verbreitet; direkte Evidenz zur optimalen Häufigkeit begrenzt → Expertenkonsens/Praxis.
+- Sprungdiagnostik: CMJ-Höhe (v. a. Mittelwert mehrerer Sprünge) ist sensibel für neuromuskuläre Ermüdung (Claudino et al., 2017, Metaanalyse). Typischer Messfehler einige Prozent → kleine Änderungen nicht überinterpretieren.
+- Seitenunterschiede: LSI ≥ 90 % als gängiges Rückkehrkriterium in der Reha; bei Gesunden sind Asymmetrien von 10–15 % häufig, Zusammenhang mit Leistung/Verletzung uneinheitlich (Bishop et al., 2018).
+- Klettern: Fingerkraft relativ zum Körpergewicht ist ein starker Leistungsprädiktor; Hangboard-Training wirksam (z. B. López-Rivera & González-Badillo, 2012). Ringband-/Sehnengewebe adaptiert langsamer als Muskulatur → Fingerlast langsam steigern, Kombination aus Hangboard + intensivem Bouldern + Griffkraft summieren.
+- Kampfsport: Hochintensiv-intermittierend; Technikqualität sinkt unter Ermüdung; Sparring/Kopftreffer erfordern eigene Erholung.
+- Beweglichkeit: Dehnen verbessert ROM verlässlich; präventive Wirkung gegen Verletzungen allgemein schwach belegt, akute Leistungsminderung durch lange statische Dehnung (>60 s) vor Schnellkraft möglich (Behm et al., 2016).
+- Körpergewicht: Tagesschwankungen von 1–2 kg normal (Wasser, Glykogen, Darminhalt) → Wochenmittel beurteilen.
+- Individuelle Reaktion: Große interindividuelle Unterschiede in Trainingsanpassung; n=1-Daten über mehrere Blöcke vergleichen statt Normwerte.`;
+
+const KB_SHORT=`Wissensanker (kurz; Autor/Jahr nur von hier übernehmen):
+- Fitness-Ermüdungs-Modell (Banister 1975); CTL/ATL/TSB nach Coggan.
+- Periodisiert > nicht periodisiert, Modelle untereinander kaum verschieden (Williams 2017; Moesgaard 2022).
+- Ausdauer: überwiegend locker, ~80/20 (Seiler & Kjerland 2006; Stöggl & Sperlich 2014).
+- Concurrent Training: Interferenz v. a. bei viel Ausdauer, eher Schnellkraft betroffen (Wilson 2012; Schumann 2022).
+- Kraft: ≥10 Sätze/Muskel/Woche für Hypertrophie (Schoenfeld 2017); RIR-Steuerung (Helms 2016).
+- Monotonie >2 bei hoher Last = Warnsignal (Foster 1998). ACWR nur deskriptiv – stark kritisiert (Impellizzeri 2020).
+- HRV: Trend vs. eigene Basis, nicht Einzelwert (Plews 2013). HRV↓ + Ruhe-HF↑ über Tage = Erholung prüfen.
+- Übertraining nur per Ausschluss, kein Einzelmarker (Meeusen 2013).
+- Taper: ~2 Wo., Umfang −40–60 %, Intensität halten (Bosquet 2007).
+- CMJ-Mittelwert sensibel für Ermüdung (Claudino 2017); LSI ≥90 % als Reha-Kriterium, bei Gesunden 10–15 % Asymmetrie häufig (Bishop 2018).
+- Finger/Ringbänder adaptieren langsamer als Muskeln → Fingerlast langsam steigern.
+- Dehnen verbessert ROM, Verletzungsprävention schwach belegt (Behm 2016).`;
+
+function systemPrompt(perspIds,short){
+  const ps=PERSP.filter(p=>perspIds.includes(p.id));
+  if(isCompact()){let s=`Du bist externer Reviewer (Trainings- und Sportwissenschaft) für das Training einer Person. Beurteile nur die Fakten im Dossier, ehrlich und ohne Schönfärberei.
+Regeln: Befund (Zahl aus dem Dossier) → Deutung → Empfehlung. Keine erfundenen Werte oder Studien; Autor/Jahr nur aus den Wissensankern. Evidenz kennzeichnen: [stark] [mittel] [Praxis]. Keine Diagnosen; bei Schmerz/Verletzung Abklärung empfehlen. Deutsch, Du-Form, Markdown.`;
+    if(ps.length)s+="\nSchwerpunkt: "+ps.map(p=>p.lab).join(", ")+".";
+    s+=short?"\nNur aus dieser Perspektive, max. 200 Wörter: Beobachtungen, Bedenken, 2 Empfehlungen."
+      :"\nGliederung (gesamt max. 400 Wörter): ## Kurzfazit · ## Plan vs. Ist · ## Belastung & Erholung · ## Risiken · ## Empfehlungen (max. 3, priorisiert) · ## Offene Fragen";
+    if(ST.kb)s+="\n\n"+KB_SHORT;
+    const lit=LIT.filter(l=>l.on);if(lit.length)s+="\n\nEigene Literatur (zitieren als [L1] …):\n"+lit.map((l,i)=>"[L"+(i+1)+"] "+l.name+"\n"+l.text.trim()).join("\n\n");
+    return s;}
+  let s=`Du bist ein externer Reviewer für das Training einer einzelnen Person: Dozent für Trainings- und Sportwissenschaft mit langjähriger Praxis in Trainingsplanung und -organisation. Die Person führt ihre Planung, ihr Tracking und ihre Mobility-Arbeit selbst und möchte eine ehrliche Außenperspektive – keine Bestätigung um ihrer selbst willen.
+
+Arbeitsweise
+1. Stütze dich auf das Dossier. Trenne sichtbar: was die Daten zeigen (Befund), wie du es deutest (Interpretation) und was du empfiehlst (Empfehlung).
+2. Benenne Datenlücken und Messgrenzen (subjektive Skalen, Polar-Nachtwerte, kleine Stichproben, fehlende Bewertungen) statt sie zu überspielen. Rechne nichts nach, was nicht im Dossier steht, und erfinde keine Werte.
+3. Begründe mit trainings- und sportwissenschaftlichen Prinzipien. Kennzeichne die Evidenzlage: [stark] = Metaanalysen/Konsens, [mittel] = einzelne Studien, [Praxis] = Erfahrungswissen/Expertenmeinung.
+4. Quellen: Nenne Autor und Jahr nur, wenn du dir sicher bist (bevorzugt aus den Wissensankern oder der eigenen Literatur). Erfinde niemals Studien, Zahlen, Titel oder DOIs. Wenn unsicher, schreibe „(Quelle nicht sicher)“.
+5. Keine medizinischen Diagnosen. Bei Hinweisen auf Schmerzen, Verletzung oder Krankheit: Abklärung durch Ärztin/Arzt oder Physiotherapie empfehlen.
+6. Empfehlungen konkret und umsetzbar, höchstens fünf, priorisiert, jeweils mit Begründung und woran man in den Daten erkennen würde, dass sie wirken.
+7. Antworte auf Deutsch, direkt und kollegial (Du-Form), in Markdown.`;
+  if(ps.length)s+="\n\nSchwerpunkt-Perspektive(n):\n"+ps.map(p=>"- "+p.txt).join("\n");
+  if(short)s+=`\n\nGib eine fokussierte Einschätzung ausschließlich aus dieser Perspektive (ca. 250–400 Wörter): wichtigste Beobachtungen (mit Zahlen aus dem Dossier), Bedenken, 2–3 Empfehlungen, Evidenzhinweis.`;
+  else s+=`\n\nGliederung der Antwort:
+## Kurzfazit
+(3–5 Sätze)
+## Plan vs. Ist
+## Belastung & Erholung
+## Bereiche
+(nur Bereiche mit Daten; je Bereich kurz)
+## Risiken & Warnsignale
+## Empfehlungen
+(priorisiert, max. 5)
+## Offene Fragen an dich
+## Evidenz & Grenzen dieser Einschätzung`;
+  if(ST.kb)s+="\n\n"+(isCompact()?KB_SHORT:KB);
+  const lit=LIT.filter(l=>l.on);
+  if(lit.length)s+="\n\nEigene Literatur/Notizen der Person (als zusätzliche Quelle nutzen, zitieren als [L1], [L2] …):\n"+lit.map((l,i)=>"[L"+(i+1)+"] "+l.name+"\n"+l.text.trim()).join("\n\n");
+  return s;
+}
+function taskText(R){const q=($("#question").value||"").trim();const fw=wkL(R.focus);
+  const T={woche:`Aufgabe: Wochenreview der Fokuswoche ${fw} im Kontext der Vorwochen. Was lief gut, was nicht, wie ist der Erholungszustand, und was folgt daraus für die nächste(n) geplante(n) Woche(n)?`,
+    block:`Aufgabe: Blockreview über den gesamten Zeitraum bis ${fw}. Hat die Periodisierung (Phasen, Deloads, Makroblöcke) funktioniert? Welche Trends zeigen Leistung, Belastung und Erholung? Was sollte im nächsten Block anders sein?`,
+    ausblick:`Aufgabe: Prüfe die geplanten Wochen nach ${fw}. Sind sie angesichts des aktuellen Belastungs- und Erholungszustands und der bisherigen Plan-Ist-Treue realistisch und sinnvoll? Schlage konkrete Anpassungen vor.`,
+    frage:`Aufgabe: Beantworte die folgende Frage auf Basis des Dossiers. Nutze die Gliederung nur so weit, wie sie zur Frage passt.`};
+  return T[ST.mode]+(q?"\n\n"+(ST.mode==="frage"?"Frage":"Kontext von mir")+": "+q:"");}
+
+/* ============================================================
+   Lokales Modell
+   ============================================================ */
+let VIA_PROXY=false,MODELS={},CTRL=null,BUSY=false;
+/* ---------- Netz-Sperre: zweite CSP, die nur noch localhost erlaubt (lässt sich bis zum Neustart nicht lockern) ---------- */
+let NETLOCKED=false;
+function lockNet(){if(NETLOCKED)return;const m=document.createElement("meta");m.httpEquiv="Content-Security-Policy";
+  m.content="connect-src 'self' http://localhost:* http://127.0.0.1:*";document.head.appendChild(m);NETLOCKED=true;updShield();}
+function updShield(){const open=!NETLOCKED;$("#shield").classList.toggle("open",open);
+  $("#shieldTxt").textContent=open?"Modell-Download offen · Netz wird vor dem Senden gesperrt":"Netz gesperrt · nur dieses Gerät";
+  $("#shield").title=open?"Im Modus „Im Gerät“ darf die App einmalig Modell-Dateien laden. Bevor deine Daten verarbeitet werden, sperrt sie jede Verbindung nach außen.":"Diese App kann technisch nur noch mit localhost / 127.0.0.1 sprechen – bis zum Neustart.";}
+const curModel=()=>ST.backend==="webgpu"?ST.wgModel:ST.model;
+function baseUrl(){const raw=ST.backend==="ollama"?ST.urlOllama:ST.urlOpenai;let u;try{u=new URL(raw);}catch(e){throw new Error("Ungültige Adresse: "+raw);}
+  if(!["localhost","127.0.0.1"].includes(u.hostname))throw new Error("Aus Datenschutzgründen sind nur Adressen auf diesem Gerät erlaubt (localhost / 127.0.0.1).");
+  if(u.protocol!=="http:")throw new Error("Bitte http:// verwenden (lokaler Server).");
+  return VIA_PROXY?location.origin+"/llm/"+(u.port||"80"):u.origin;}
+const isCloud=(name,meta)=>/(^|[-:_])cloud(\b|$)/i.test(name||"")||!!(meta&&(meta.remote_host||meta.remote_model));
+function setConn(cls,txt){$("#connStatus").innerHTML='<span class="dot '+cls+'"></span><span>'+txt+'</span>';}
+async function connect(){if(ST.backend==="webgpu")return wgCheck();setConn("warn","verbinde …");
+  try{const b=baseUrl();const r=await fetch(b+(ST.backend==="ollama"?"/api/tags":"/v1/models"),{cache:"no-store"});if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();
+    const list=ST.backend==="ollama"?(j.models||[]).map(m=>({id:m.name||m.model,meta:m,size:m.size,params:m.details&&m.details.parameter_size})):(j.data||[]).map(m=>({id:m.id,meta:m}));
+    MODELS={};list.forEach(m=>MODELS[m.id]=m);const sel=$("#model");sel.innerHTML=list.length?"":'<option value="">– kein Modell installiert –</option>';
+    list.forEach(m=>{const o=document.createElement("option");o.value=m.id;const c=isCloud(m.id,m.meta);o.textContent=m.id+(m.params?" · "+m.params:"")+(m.size?" · "+(m.size/1e9).toFixed(1)+" GB":"")+(c?" · Cloud – gesperrt":"");o.disabled=c;sel.appendChild(o);});
+    const ok=list.filter(m=>!isCloud(m.id,m.meta));if(!ST.model||!MODELS[ST.model]||isCloud(ST.model,MODELS[ST.model].meta))ST.model=ok[0]?ok[0].id:"";sel.value=ST.model;save();
+    setConn("ok","verbunden"+(VIA_PROXY?" über Startskript":"")+" · "+ok.length+" lokale Modelle"+(list.length>ok.length?" ("+(list.length-ok.length)+" Cloud-Modelle gesperrt)":""));updHdr();
+  }catch(e){MODELS={};setConn("bad",esc(connHint(e)));}}
+function connHint(e){const m=String(e&&e.message||e);if(/Datenschutz|Ungültig|http:\/\//.test(m))return m;
+  const what=ST.backend==="ollama"?"Ollama":"der llama.cpp-/LM-Studio-Server";
+  return "Keine Verbindung ("+m+"). Läuft "+what+"? "+(PHONE?"Am Handy: Termux öffnen, „ollama serve“ läuft? (Hilfe-Tab)":VIA_PROXY?"":location.protocol==="file:"?"Direkt aus der Datei geöffnet: CORS freigeben oder Startskript nutzen (Hilfe).":"");}
+function updHdr(){$("#hdrModel").textContent=curModel()?"Modell: "+curModel():"";}
+
+/* ---------- Im Gerät: WebLLM über WebGPU ---------- */
+const WEBLLM_URLS=["./web-llm.js","https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/+esm"];
+const WG_PREF=["Qwen3-4B-q4f16_1-MLC","Qwen3-1.7B-q4f16_1-MLC","Llama-3.2-3B-Instruct-q4f16_1-MLC","Qwen2.5-3B-Instruct-q4f16_1-MLC","Phi-3.5-mini-instruct-q4f16_1-MLC","gemma-2-2b-it-q4f16_1-MLC","Qwen3-0.6B-q4f16_1-MLC"];
+let WL=null,ENGINE=null,ENGINE_ID=null;
+async function webllmLib(){if(WL)return WL;let last=null;for(const u of WEBLLM_URLS){try{const m=await import(u);if(m&&m.CreateMLCEngine){WL=m;return WL;}}catch(e){last=e;}}
+  throw new Error("Die Bibliothek für „Im Gerät“ lässt sich nicht laden – beim ersten Mal ist Internet nötig."+(last?" ("+(last.message||last)+")":""));}
+async function wgCheck(){setConn("warn","prüfe Grafikeinheit …");
+  try{if(!navigator.gpu)throw new Error("WebGPU wird von diesem Gerät/WebView nicht angeboten.");const ad=await navigator.gpu.requestAdapter();if(!ad)throw new Error("Keine passende Grafikeinheit gefunden (WebGPU).");
+    if(NETLOCKED&&!ENGINE)throw new Error("Netz ist bereits gesperrt – App neu starten, um ein Modell herunterzuladen.");
+    const L=ENGINE&&NETLOCKED?null:await webllmLib();const sel=$("#wgModel");
+    if(L){const list=(L.prebuiltAppConfig&&L.prebuiltAppConfig.model_list||[]).filter(m=>(m.model_type==null||m.model_type===0)&&m.vram_required_MB&&m.vram_required_MB<=5200&&!/embed|vision|-1k$/i.test(m.model_id));
+      list.sort((a,b)=>{const pa=WG_PREF.indexOf(a.model_id),pb=WG_PREF.indexOf(b.model_id);return (pa<0?99:pa)-(pb<0?99:pb)||b.vram_required_MB-a.vram_required_MB;});
+      sel.innerHTML=list.map(m=>'<option value="'+esc(m.model_id)+'">'+esc(m.model_id.replace(/-MLC$/,""))+" · ~"+(m.vram_required_MB/1024).toFixed(1)+" GB"+(WG_PREF.includes(m.model_id)?"":" ")+"</option>").join("")||'<option value="">– keine passenden Modelle –</option>';
+      if(!ST.wgModel||!list.some(m=>m.model_id===ST.wgModel))ST.wgModel=(list[0]||{}).model_id||"";sel.value=ST.wgModel;save();}
+    setConn(ENGINE?"ok":"warn",ENGINE?"geladen: "+esc(ENGINE_ID):"WebGPU verfügbar"+(ad.info&&ad.info.vendor?" ("+esc(ad.info.vendor)+")":"")+" – Modell wählen und „Modell laden“");updHdr();
+  }catch(e){setConn("bad",esc(e.message||e)+" → Ollama in Termux nutzen (Hilfe-Tab).");}}
+async function wgLoad(){if(ENGINE&&ENGINE_ID===ST.wgModel)return ENGINE;
+  if(!ST.wgModel)throw new Error("Erst „Gerät prüfen“ und ein Modell wählen.");
+  if(NETLOCKED)throw new Error("Das Netz ist schon gesperrt. Zum Herunterladen eines anderen Modells die App neu starten.");
+  const L=await webllmLib();keepAwake(true);const prog=$("#wgProg");prog.textContent="Starte … (beim ersten Mal wird das Modell heruntergeladen und gespeichert)";
+  const cb={initProgressCallback:r=>{prog.textContent=(r.text||"")+(r.progress!=null?"  ["+Math.round(r.progress*100)+" %]":"");}};
+  try{if(ENGINE){try{await ENGINE.unload();}catch(e){}}
+    try{ENGINE=await L.CreateMLCEngine(ST.wgModel,cb,{context_window_size:+ST.numCtx});}catch(e){ENGINE=await L.CreateMLCEngine(ST.wgModel,cb);}
+    ENGINE_ID=ST.wgModel;prog.textContent="Bereit. Modell ist auf dem Gerät gespeichert – beim nächsten Start ohne Download.";setConn("ok","geladen: "+esc(ENGINE_ID));return ENGINE;}
+  catch(e){ENGINE=null;ENGINE_ID=null;prog.textContent="";throw new Error("Modell konnte nicht geladen werden: "+(e.message||e)+(/memory|OOM|allocate/i.test(String(e))?" – zu wenig Speicher, kleineres Modell wählen.":""));}
+  finally{if(!BUSY)keepAwake(false);}}
+
+function keepAwake(on){try{const K=PL("KeepAwake");if(K)on?K.keepAwake():K.allowSleep();}catch(e){}}
+const wantsNoThink=()=>ST.noThink&&/qwen3|deepseek-r1|magistral|smollm3/i.test(curModel()||"");
+
+async function streamChat(messages,onUpd){
+  if(!curModel())throw new Error(ST.backend==="webgpu"?"Kein Modell geladen – „Gerät prüfen“ und „Modell laden“.":"Kein Modell gewählt – erst verbinden.");
+  if(ST.backend!=="webgpu"&&isCloud(ST.model,MODELS[ST.model]&&MODELS[ST.model].meta))throw new Error("Cloud-Modelle sind gesperrt – die Daten würden das Gerät verlassen.");
+  let raw="",think="",stats=null,last=0;
+  const emit=()=>{const tm=[...raw.matchAll(/<think>([\s\S]*?)(<\/think>|$)/g)].map(m=>m[1]).join("\n");const vis=raw.replace(/<think>[\s\S]*?(<\/think>|$)/g,"").replace(/^\s+/,"");onUpd(vis,(think+(tm?"\n"+tm:"")).trim());};
+  const tick=()=>{const now=performance.now();if(now-last>80){emit();last=now;}};
+  let msgs=messages;
+  if(wantsNoThink()&&ST.backend!=="ollama"){msgs=messages.map((m,i)=>i===messages.length-1&&m.role==="user"?{role:"user",content:m.content+"\n\n/no_think"}:m);}
+  CTRL=new AbortController();
+  if(ST.backend==="webgpu"){
+    const eng=await wgLoad();lockNet();
+    const onAbort=()=>{try{eng.interruptGenerate();}catch(e){}};CTRL.signal.addEventListener("abort",onAbort);
+    const t0=performance.now();
+    const chunks=await eng.chat.completions.create({messages:msgs,stream:true,temperature:+ST.temp,stream_options:{include_usage:true}});
+    for await(const c of chunks){const d=c.choices&&c.choices[0]&&c.choices[0].delta;if(d&&d.content){raw+=d.content;tick();}if(c.usage)stats={tokIn:c.usage.prompt_tokens,tokOut:c.usage.completion_tokens,sec:(performance.now()-t0)/1000};}
+    emit();if(CTRL.signal.aborted){const e=new Error("Abgebrochen");e.name="AbortError";throw e;}
+  }else{
+    lockNet();
+    const b=baseUrl();const oll=ST.backend==="ollama";
+    const body=oll?{model:ST.model,messages:msgs,stream:true,options:{temperature:+ST.temp,num_ctx:+ST.numCtx}}:{model:ST.model,messages:msgs,stream:true,temperature:+ST.temp};
+    if(oll&&wantsNoThink())body.think=false;
+    const r=await fetch(b+(oll?"/api/chat":"/v1/chat/completions"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:CTRL.signal});
+    if(!r.ok){let t="";try{t=await r.text();}catch(e){}throw new Error("Modell-Fehler HTTP "+r.status+": "+t.slice(0,300));}
+    const rd=r.body.getReader(),dec=new TextDecoder();let buf="";
+    const handle=line=>{line=line.trim();if(!line)return;
+      if(oll){let j;try{j=JSON.parse(line);}catch(e){return;}if(j.error)throw new Error(j.error);if(j.message){if(j.message.thinking)think+=j.message.thinking;if(j.message.content)raw+=j.message.content;}if(j.done)stats={tokIn:j.prompt_eval_count,tokOut:j.eval_count,sec:j.total_duration?j.total_duration/1e9:null};}
+      else{if(!line.startsWith("data:"))return;const d=line.slice(5).trim();if(d==="[DONE]")return;let j;try{j=JSON.parse(d);}catch(e){return;}if(j.error)throw new Error(j.error.message||j.error);
+        const dl=(j.choices&&j.choices[0]&&j.choices[0].delta)||{};if(dl.reasoning_content||dl.reasoning)think+=dl.reasoning_content||dl.reasoning;if(dl.content)raw+=dl.content;if(j.usage)stats={tokIn:j.usage.prompt_tokens,tokOut:j.usage.completion_tokens};}};
+    while(true){const {value,done}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;while((i=buf.indexOf("\n"))>=0){handle(buf.slice(0,i));buf=buf.slice(i+1);}tick();}
+    if(buf.trim())handle(buf);emit();
+  }
+  return {text:raw.replace(/<think>[\s\S]*?(<\/think>|$)/g,"").trim(),stats};
+}
+
+/* ============================================================
+   Markdown (klein, ohne HTML-Durchreichung)
+   ============================================================ */
+function md(src){const lines=String(src||"").replace(/\r/g,"").split("\n");let h="",list=null,para=[],inCode=false,code=[],tb=[];
+  const inl=s=>esc(s).replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=[\s).,;:!?]|$)/g,"$1<i>$2</i>");
+  const fP=()=>{if(para.length){h+="<p>"+inl(para.join(" "))+"</p>";para=[];}},fL=()=>{if(list){h+="</"+list+">";list=null;}};
+  const fT=()=>{if(tb.length){const rows=tb.filter(r=>!/^\s*\|?\s*:?-{2,}/.test(r)).map(r=>r.trim().replace(/^\|/,"").replace(/\|$/,"").split("|").map(c=>c.trim()));h+='<div class="tw"><table>'+rows.map((r,i)=>"<tr>"+r.map(c=>i?"<td>"+inl(c)+"</td>":"<th>"+inl(c)+"</th>").join("")+"</tr>").join("")+"</table></div>";tb=[];}};
+  for(const ln of lines){
+    if(/^\s*```/.test(ln)){if(inCode){h+="<pre>"+esc(code.join("\n"))+"</pre>";code=[];inCode=false;}else{fP();fL();fT();inCode=true;}continue;}
+    if(inCode){code.push(ln);continue;}
+    if(/^\s*\|.*\|\s*$/.test(ln)){fP();fL();tb.push(ln);continue;}else fT();
+    let m;
+    if((m=ln.match(/^\s*(#{1,5})\s+(.*)/))){fP();fL();const n=Math.min(5,m[1].length+1);h+="<h"+n+">"+inl(m[2].replace(/#+\s*$/,""))+"</h"+n+">";continue;}
+    if((m=ln.match(/^\s*[-*•]\s+(.*)/))){fP();if(list!=="ul"){fL();h+="<ul>";list="ul";}h+="<li>"+inl(m[1])+"</li>";continue;}
+    if((m=ln.match(/^\s*\d+[.)]\s+(.*)/))){fP();if(list!=="ol"){fL();h+="<ol>";list="ol";}h+="<li>"+inl(m[1])+"</li>";continue;}
+    if(/^\s*(-{3,}|\*{3,})\s*$/.test(ln)){fP();fL();h+="<hr>";continue;}
+    if(!ln.trim()){fP();fL();continue;}
+    if(list&&/^\s{2,}/.test(ln)){h=h.replace(/<\/li>$/," "+inl(ln.trim())+"</li>");continue;}
+    fL();para.push(ln.trim());}
+  if(inCode)h+="<pre>"+esc(code.join("\n"))+"</pre>";fP();fL();fT();return h;}
+
+/* ============================================================
+   Review-Ablauf
+   ============================================================ */
+let DOS=null,DOS_EDITED=false,CONV=null;
+/* Token-Schätzung bewusst vorsichtig (Deutsch + Zahlen ≈ 3 Zeichen/Token) */
+const tok=s=>Math.round(String(s||"").length/3);
+/* Platz, den das Modell außer dem Dossier braucht: Anweisungen, Aufgabe, Antwort (+ Gremium-Texte bei der Synthese) */
+function ctxReserve(){const sys=tok(systemPrompt(ST.persp,false)),ans=isCompact()?900:1800,panel=ST.panel&&ST.persp.length>1?ST.persp.length*(isCompact()?400:800):0;return {sys,ans,panel,task:250,total:sys+ans+panel+250};}
+function dossierBudget(){return Math.max(600,ST.numCtx-ctxReserve().total);}
+/* Dossier bauen und bei Bedarf schrittweise kürzen, bis es passt */
+const FIT_ORDER=["extra","gew","mob","griff","sprung","velo","sess","kraft","polar","erh"];
+function buildFitted(){let d=buildDossier();if(!ST.autoFit)return d;const budget=dossierBudget();if(tok(d.text)<=budget)return d;
+  const keepBack=ST.back,keepInc=Object.assign({},ST.inc),cuts=[];
+  try{const minBack=ST.mode==="block"?4:2;
+    while(tok(d.text)>budget&&ST.back>minBack){ST.back--;d=buildDossier();}
+    if(ST.back<keepBack)cuts.push("Rückblick "+keepBack+"→"+ST.back+" Wochen");
+    for(const k of FIT_ORDER){if(tok(d.text)<=budget)break;if(ST.inc[k]){ST.inc[k]=0;d=buildDossier();cuts.push(INC_LABEL[k]+" weggelassen");}}
+    if(tok(d.text)>budget){d.text=d.text.slice(0,budget*3).replace(/\n[^\n]*$/,"")+"\n[… Rest gekürzt]";cuts.push("Rest abgeschnitten");}
+  }finally{ST.back=keepBack;ST.inc=keepInc;}
+  d.cuts=cuts;const i=d.text.indexOf("\n\n");d.text=d.text.slice(0,i)+"\nHinweis: Automatisch gekürzt, damit alles ins Modell passt ("+cuts.join("; ")+")."+d.text.slice(i);return d;}
+function currentDossierText(){return DOS_EDITED?$("#dos").value:(DOS?DOS.text:"");}
+function rebuildDossier(force){if(!WB&&!JS){DOS=null;$("#dos").value="";updTok();return;}
+  if(DOS_EDITED&&!force){updTok();return;}
+  try{DOS=buildFitted();$("#dos").value=DOS.text;DOS_EDITED=false;}catch(e){showErr(e);}updTok();}
+function updTok(){const t=tok(currentDossierText()),rs=ctxReserve(),sys=rs.sys,tot=t+rs.total;const pctv=Math.min(100,tot/ST.numCtx*100);
+  $("#tokBadge").textContent=currentDossierText()?"≈"+(t/1000).toFixed(1)+"k":"";
+  const bar=$("#tokBar");bar.className="bar"+(pctv>90?" bad":pctv>70?" warn":"");bar.firstElementChild.style.width=pctv+"%";
+  $("#dosInfo").innerHTML=currentDossierText()?("Dossier ≈ "+t.toLocaleString("de")+" Tokens · mit Anweisungen"+(ST.kb?" & Wissensankern":"")+(LIT.some(l=>l.on)?" & Literatur":"")+" ≈ "+tot.toLocaleString("de")+" von "+(+ST.numCtx).toLocaleString("de")+" Kontext"+" (inkl. Platz für die Antwort)"
+    +(DOS&&DOS.cuts&&DOS.cuts.length&&!DOS_EDITED?'<br><b>Automatisch gekürzt:</b> '+esc(DOS.cuts.join(" · ")):"")
+    +(sys>ST.numCtx*0.5?'<br><b style="color:var(--bad)">Schon die Anweisungen sind sehr lang ('+sys.toLocaleString("de")+' Tokens) – eigene Literatur abwählen oder Wissensanker ausschalten.</b>':"")
+    +(tot>ST.numCtx?'<br><b style="color:var(--bad)">Passt nicht: Kontextlänge erhöhen, Kompakt einschalten, Zeitraum verkürzen oder Bereiche abwählen.</b>':"")
+    +(DOS_EDITED?" · <b>von dir bearbeitet</b>":"")):"Noch keine Daten geladen.";
+  $("#sysPreview").textContent=systemPrompt(ST.persp,false);}
+
+function setBusy(b){BUSY=b;keepAwake(b);$("#btnRun").disabled=b;$("#btnFollow").disabled=b;$("#btnStop").classList.toggle("hide",!b);$("#btnExport").disabled=b||!CONV;$("#btnCopy").disabled=b||!CONV;}
+function msgEl(cls,html){const d=document.createElement("div");d.className="msg "+cls;d.innerHTML=html;$("#conv").appendChild(d);return d;}
+function assistantBox(title){const wrap=document.createElement("div");wrap.className="msg";wrap.innerHTML=(title?'<details class="panel" open><summary>'+esc(title)+'</summary>':"")+'<details class="think hide"><summary>Gedankengang des Modells</summary><div class="tt"></div></details><div class="md cursor"></div>'+(title?"</details>":"");$("#conv").appendChild(wrap);
+  const mdEl=$(".md",wrap),th=$("details.think",wrap),tt=$(".tt",th);
+  return {wrap,upd(v,t){mdEl.innerHTML=md(v);if(t){th.classList.remove("hide");tt.textContent=t;}},done(){mdEl.classList.remove("cursor");},fold(){const p=$("details.panel",wrap);if(p)p.open=false;}};}
+
+async function runReview(){
+  if(BUSY)return;if(!WB){toast("Erst die Planungsmappe wählen.");return;}
+  if(!curModel()){toast(ST.backend==="webgpu"?"Erst „Gerät prüfen“ und ein Modell wählen.":"Erst das lokale Modell verbinden und auswählen.");selTab("setup");return;}
+  if(ST.mode==="frage"&&!$("#question").value.trim()){toast("Bitte eine Frage eingeben.");$("#question").focus();return;}
+  if(!DOS_EDITED){await refresh("mappe",true);await refresh("json",true);rebuildDossier(true);}
+  const dossier=currentDossierText(),R=DOS?DOS.range:weeksRange(),task=taskText(R);
+  if(tok(dossier)+ctxReserve().total>ST.numCtx&&!confirm("Das Dossier ist größer als die Kontextlänge ("+ST.numCtx+" Tokens). Das Modell würde den Anfang abschneiden. Trotzdem senden?")){selTab("dossier");return;}
+  const persp=ST.persp.length?ST.persp:["tw"];
+  CONV={id:"r"+Date.now(),ts:new Date().toISOString(),mode:ST.mode,focus:R.focus,model:curModel(),persp,panelOut:[],messages:[],dossier};
+  CONV.title=({woche:"Wochenreview",block:"Blockreview",ausblick:"Ausblick",frage:"Frage"})[ST.mode]+" "+wkL(R.focus);
+  $("#conv").innerHTML="";selTab("review");
+  $("#revMeta").textContent=CONV.title+" · "+curModel();window.scrollTo(0,0);
+  if(PHONE&&ST.panel&&persp.length>1)toast("Gremium auf dem Handy: "+(persp.length+1)+" Durchläufe – das dauert entsprechend.",5000);
+  msgEl("sent",'<div class="sent">An <b>'+esc(curModel())+'</b> auf diesem Gerät gesendet: Dossier ≈ '+tok(dossier).toLocaleString("de")+" Tokens · "+esc(task.split("\n")[0].replace(/^Aufgabe: /,""))+(task.includes("\n\n")?"<br>"+esc(task.split("\n\n").slice(1).join(" ")):"")+"</div>");
+  setBusy(true);$("#followBox").classList.add("hide");
+  try{
+    const user=task+"\n\n---\n\n"+dossier;
+    if(ST.panel&&persp.length>1){
+      for(const pid of persp){const p=PERSP.find(x=>x.id===pid);const box=assistantBox("Perspektive: "+p.lab);
+        const r=await streamChat([{role:"system",content:systemPrompt([pid],true)},{role:"user",content:user}],(v,t)=>box.upd(v,t));box.done();box.fold();CONV.panelOut.push({id:pid,lab:p.lab,text:r.text});}
+      const syn=user+"\n\n---\n\nEinschätzungen aus dem Gremium (unabhängig erstellt):\n\n"+CONV.panelOut.map(o=>"### "+o.lab+"\n"+o.text).join("\n\n")+"\n\n---\n\nFühre die Einschätzungen zu einem Gesamtreview zusammen. Benenne, wo die Perspektiven übereinstimmen und wo sie sich widersprechen, und entscheide begründet.";
+      CONV.messages=[{role:"system",content:systemPrompt(persp,false)},{role:"user",content:syn}];
+    }else CONV.messages=[{role:"system",content:systemPrompt(persp,false)},{role:"user",content:user}];
+    if(ST.panel&&persp.length>1)msgEl("",'<div style="font-size:17px;font-weight:700;margin:20px 0 0;padding-bottom:4px;border-bottom:2px solid var(--pri)">Gesamtreview</div>');
+    const box=assistantBox();
+    const r=await streamChat(CONV.messages,(v,t)=>box.upd(v,t));box.done();
+    CONV.messages.push({role:"assistant",content:r.text});CONV.stats=r.stats;
+    if(r.stats&&r.stats.tokIn)msgEl("",'<div class="muted small">Eingabe '+r.stats.tokIn.toLocaleString("de")+" Tokens · Antwort "+(r.stats.tokOut||0).toLocaleString("de")+" Tokens"+(r.stats.sec?" · "+Math.round(r.stats.sec)+" s":"")+(r.stats.tokIn>=ST.numCtx-50?' · <b style="color:var(--bad)">Kontext voll – Dossier wurde evtl. abgeschnitten</b>':"")+"</div>");
+    await IDB.put("reviews",CONV);$("#followBox").classList.remove("hide");renderHist();
+  }catch(e){if(e.name==="AbortError"){msgEl("",'<div class="muted small">Abgebrochen.</div>');}else{msgEl("",'<div class="note">'+esc(e.message||e)+"</div>");}}
+  finally{setBusy(false);}
+}
+async function followUp(){const q=$("#followIn").value.trim();if(!q||!CONV||BUSY)return;
+  msgEl("user",'<div class="who">Du</div>'+md(q));$("#followIn").value="";CONV.messages.push({role:"user",content:q});setBusy(true);
+  try{const box=assistantBox();const r=await streamChat(CONV.messages,(v,t)=>box.upd(v,t));box.done();CONV.messages.push({role:"assistant",content:r.text});await IDB.put("reviews",CONV);}
+  catch(e){CONV.messages.pop();msgEl("",'<div class="note">'+esc(e.name==="AbortError"?"Abgebrochen.":e.message||e)+"</div>");}
+  finally{setBusy(false);}}
+
+function showConv(c){CONV=c;$("#conv").innerHTML="";$("#revMeta").textContent=c.title+" · "+c.model+" · "+new Date(c.ts).toLocaleString("de");
+  msgEl("sent",'<div class="sent">Gespeichertes Review vom '+esc(new Date(c.ts).toLocaleString("de"))+" · Perspektiven: "+esc(c.persp.map(id=>(PERSP.find(p=>p.id===id)||{}).lab).join(", "))+"</div>");
+  (c.panelOut||[]).forEach(o=>{const b=assistantBox("Perspektive: "+o.lab);b.upd(o.text);b.done();b.fold();});
+  c.messages.slice(2).forEach((m,i)=>{if(m.role==="user")msgEl("user",'<div class="who">Du</div>'+md(m.content));else{const b=assistantBox();b.upd(m.content);b.done();}});
+  $("#followBox").classList.remove("hide");setBusy(false);selTab("review");}
+
+function convMarkdown(withDos){const c=CONV;if(!c)return "";let s="# "+c.title+"\n\n_Erstellt "+new Date(c.ts).toLocaleString("de")+" · Modell "+c.model+" (lokal) · Perspektiven: "+c.persp.map(id=>(PERSP.find(p=>p.id===id)||{}).lab).join(", ")+"_\n\n";
+  (c.panelOut||[]).forEach(o=>{s+="## Perspektive: "+o.lab+"\n\n"+o.text.replace(/^(#{1,4}) /gm,"$1## ")+"\n\n";});if(c.panelOut&&c.panelOut.length)s+="---\n\n# Gesamtreview\n\n";
+  c.messages.slice(2).forEach(m=>{s+=m.role==="user"?"\n> **Nachfrage:** "+m.content.replace(/\n/g,"\n> ")+"\n\n":m.content+"\n\n";});
+  if(withDos&&c.dossier)s+="\n---\n\n<details><summary>Dossier</summary>\n\n```\n"+c.dossier+"\n```\n</details>\n";return s;}
+async function exportMd(){if(!CONV)return;const txt=convMarkdown($("#expDos").checked);const name="Review_"+("KW"+isoWeek(CONV.focus))+"_"+CONV.ts.slice(0,10)+".md";
+  if(PL("Filesystem")&&PL("Share")){try{const FS=PL("Filesystem");await FS.writeFile({path:name,data:btoa(unescape(encodeURIComponent(txt))),directory:"CACHE"});const u=await FS.getUri({path:name,directory:"CACHE"});
+      await PL("Share").share({title:name,url:u.uri,dialogTitle:"Review speichern oder teilen"});}catch(e){if(!/cancel/i.test(String(e&&e.message||e)))showErr(e);}return;}
+  if(window.showSaveFilePicker){try{const h=await showSaveFilePicker({suggestedName:name,types:[{description:"Markdown",accept:{"text/markdown":[".md"]}}]});const w=await h.createWritable();await w.write(txt);await w.close();toast("Gespeichert: "+h.name);return;}catch(e){if(e.name==="AbortError")return;}}
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/markdown"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+async function copyMd(){try{await navigator.clipboard.writeText(convMarkdown(false));toast("Kopiert.");}catch(e){toast("Kopieren nicht möglich.");}}
+
+/* ---------- Verlauf ---------- */
+async function renderHist(){const all=(await IDB.all("reviews")).sort((a,b)=>a.ts<b.ts?1:-1);const el=$("#histList");
+  if(!all.length){el.innerHTML='<p class="muted">Noch keine Reviews.</p>';return;}
+  el.innerHTML=all.map(c=>'<div class="hist"><div class="t"><b>'+esc(c.title)+'</b><span class="muted small">'+esc(new Date(c.ts).toLocaleString("de"))+" · "+esc(c.model)+" · "+c.messages.filter(m=>m.role==="assistant").length+(c.panelOut&&c.panelOut.length?" + "+c.panelOut.length+" Perspektiven":"")+' Antwort(en)</span></div><button class="btn sm" data-open="'+c.id+'">Öffnen</button><button class="btn sm ghost" data-del="'+c.id+'">Löschen</button></div>').join("");}
+$("#histList").addEventListener("click",async e=>{const o=e.target.dataset.open,d=e.target.dataset.del;if(o){const c=await IDB.get("reviews",o);if(c)showConv(c);}if(d&&confirm("Review löschen?")){await IDB.del("reviews",d);renderHist();}});
+
+/* ---------- Eigene Literatur ---------- */
+let LIT=[];
+async function loadLit(){LIT=(await IDB.all("lit")).sort((a,b)=>a.id<b.id?-1:1);renderLit();}
+function renderLit(){const el=$("#litList");if(!LIT.length){el.innerHTML='<p class="muted small">Noch keine Einträge.</p>';updTok();return;}
+  el.innerHTML=LIT.map(l=>'<div class="lit"><input type="checkbox" data-lt="'+l.id+'"'+(l.on?" checked":"")+' style="margin-top:4px;accent-color:var(--pri)"><div class="t"><b>'+esc(l.name)+'</b><div class="muted small">≈ '+tok(l.text).toLocaleString("de")+" Tokens · "+esc(cut(l.text,140))+'</div></div><button class="btn sm ghost" data-ld="'+l.id+'">Entfernen</button></div>').join("");updTok();}
+$("#litList").addEventListener("change",async e=>{const id=e.target.dataset.lt;if(!id)return;const l=LIT.find(x=>x.id===id);l.on=e.target.checked;await IDB.put("lit",l);rebuildDossier();});
+$("#litList").addEventListener("click",async e=>{const id=e.target.dataset.ld;if(!id)return;await IDB.del("lit",id);LIT=LIT.filter(x=>x.id!==id);renderLit();});
+$("#btnLitFile").onclick=()=>$("#in_lit").click();
+$("#in_lit").onchange=async e=>{for(const f of e.target.files){const l={id:"l"+Date.now()+Math.random().toString(36).slice(2,6),name:f.name.replace(/\.(txt|md)$/i,""),text:await f.text(),on:true};await IDB.put("lit",l);LIT.push(l);}e.target.value="";renderLit();};
+$("#btnLitPaste").onclick=()=>$("#litPaste").classList.remove("hide");
+$("#btnLitCancel").onclick=()=>$("#litPaste").classList.add("hide");
+$("#btnLitSave").onclick=async()=>{const t=$("#litText").value.trim();if(!t)return;const l={id:"l"+Date.now(),name:$("#litTitle").value.trim()||"Notiz",text:t,on:true};await IDB.put("lit",l);LIT.push(l);$("#litTitle").value="";$("#litText").value="";$("#litPaste").classList.add("hide");renderLit();};
+
+/* ============================================================
+   Oberfläche
+   ============================================================ */
+function selTab(t){if(t==="setup"&&!matchMedia("(max-width:900px)").matches)t="review";document.body.classList.toggle("setup",t==="setup");
+  $$("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));$$(".pane").forEach(p=>p.classList.toggle("on",p.id==="p_"+t));}
+$("#tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b)selTab(b.dataset.tab);});
+["mappe","json"].forEach(k=>$("#in_"+k).onchange=e=>{const f=e.target.files[0];if(f)loadFile(k,f);e.target.value="";});
+
+function renderFiles(){
+  const fm=$("#f_mappe"),fj=$("#f_json");
+  fm.classList.toggle("ok",!!WB);const lm=linked("mappe"),lj=linked("json");
+  fm.querySelector(".nm").innerHTML=WB?esc(WBNAME)+"<small>"+Object.keys(WB).length+" Blätter"+(WBTIME?" · geändert "+new Date(WBTIME).toLocaleString("de"):"")+(lm?" · verbunden":"")+"</small>":(lm?esc(lm.name)+"<small>verbunden – „Neu lesen“ tippen</small>":"Planungsmappe<small>.xlsx – Pflicht</small>");
+  fm.querySelector("[data-pick]").textContent=lm?"Neu lesen":WB?"Andere…":"Wählen";fm.querySelector("[data-other]").classList.toggle("hide",!lm);
+  fj.classList.toggle("ok",!!JS);fj.querySelector(".nm").innerHTML=JS?esc(JSNAME)+"<small>"+["training","sleep","recharge","power"].filter(k=>JS[k]&&JS[k].length).map(k=>JS[k].length+" "+({training:"Einheiten",sleep:"Nächte",recharge:"Recharge",power:"Velo"})[k]).join(" · ")+"</small>":(lj?esc(lj.name)+"<small>verbunden – „Neu lesen“ tippen</small>":"Trainingsdatei<small>.json – optional (Polar, Schlaf, HRV, Velo, Griff, Sprung)</small>");
+  fj.querySelector("[data-pick]").textContent=lj?"Neu lesen":JS?"Andere…":"Wählen";fj.querySelector("[data-other]").classList.toggle("hide",!lj);
+  const info=$("#sheetInfo");if(!WB){info.innerHTML="";return;}
+  const has=n=>!!rowsOf(n);const grp=[["Planung",["Gesamt","Klettern","Velo","Kickbox","Kraft","Makroplan","Ausdauer-Plan","Balance"]],["Tracking",["Sessions","Kraft-Sätze","Kraftmessung","Griff-Training","Sprung","Gewicht"]],["Mobility",["Mobility-Verlauf","Mobility-Erledigt","Assistance-Log"]]];
+  const extra=Object.keys(WB).filter(n=>!KNOWN.has(n)&&n!=="Griff-Training");
+  info.innerHTML=grp.map(([t,a])=>{const f=a.filter(has);return "<b>"+t+":</b> "+(f.length?f.join(", "):"–");}).join("<br>")+(extra.length?"<br><b>Weitere:</b> "+esc(extra.join(", ")):"")+"<br>Letzte Daten: "+dm(lastDataDate())+lastDataDate().getUTCFullYear();}
+// Verknüpfte Datei erneut lesen statt neu wählen
+$$("[data-pick]").forEach(b=>b.onclick=async()=>{const k=b.dataset.pick;if(linked(k)){if(await refresh(k))toast("Neu gelesen.");}else pick(k);});
+$$("[data-other]").forEach(b=>b.onclick=()=>pick(b.dataset.other));
+
+function dataChanged(resetFocus){if(resetFocus||!FOCUS){FOCUS=defaultFocus();$("#focus").value=FOCUS;}renderFiles();rangeInfo();rebuildDossier(true);}
+function rangeInfo(){const R=weeksRange();$("#rangeInfo").textContent=wkL(R.all[0])+" – "+wkL(R.all[R.all.length-1])+" · Fokus "+wkL(R.focus);}
+
+function renderControls(){
+  $$("#beSeg button").forEach(b=>b.classList.toggle("on",b.dataset.be===ST.backend));
+  $("#url").value=ST.backend==="ollama"?ST.urlOllama:ST.urlOpenai;
+  $$("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===ST.mode));
+  $("#qLabel").textContent=ST.mode==="frage"?"Deine Frage":"Kontext / Frage (optional)";
+  const opt=(sel,arr,v)=>{sel.innerHTML=arr.map(x=>'<option value="'+x+'"'+(x==v?" selected":"")+">"+x+"</option>").join("");};
+  opt($("#back"),[2,3,4,6,8,10,12,16,20,26],ST.back);opt($("#ahead"),[0,1,2,3,4,6,8,12],ST.ahead);
+  $("#numCtx").value=String(ST.numCtx);$("#temp").value=ST.temp;$("#panel").checked=ST.panel;$("#kb").checked=ST.kb;$("#profile").value=ST.profile||"";
+  $("#compact").checked=isCompact();$("#compact").disabled=+ST.numCtx<=8192;$("#autoFit").checked=ST.autoFit!==false;$("#noThink").checked=!!ST.noThink;
+  $("#srvBox").classList.toggle("hide",ST.backend==="webgpu");$("#wgBox").classList.toggle("hide",ST.backend!=="webgpu");
+  $("#perspChips").innerHTML=PERSP.map(p=>'<label class="chip'+(ST.persp.includes(p.id)?" on":"")+'" title="'+esc(p.txt)+'"><input type="checkbox" value="'+p.id+'"'+(ST.persp.includes(p.id)?" checked":"")+">"+esc(p.lab)+"</label>").join("");
+  $("#incChips").innerHTML=Object.entries(INC_LABEL).map(([k,l])=>'<label class="chip'+(ST.inc[k]?" on":"")+'"><input type="checkbox" value="'+k+'"'+(ST.inc[k]?" checked":"")+">"+esc(l)+"</label>").join("");
+  updHdr();}
+$("#beSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.dataset.be===ST.backend)return;
+  if(b.dataset.be==="webgpu"&&NETLOCKED&&!ENGINE){ST.backend="webgpu";save();toast("Für den Modell-Download startet die App neu …");setTimeout(()=>location.reload(),900);return;}
+  ST.backend=b.dataset.be;save();renderControls();$("#model").innerHTML='<option value="">– erst verbinden –</option>';updHdr();connect();});
+$("#wgModel").onchange=e=>{ST.wgModel=e.target.value;save();updHdr();if(ENGINE&&ENGINE_ID!==ST.wgModel)setConn("warn","anderes Modell gewählt – „Modell laden“");};
+$("#btnWgCheck").onclick=wgCheck;
+$("#btnWgLoad").onclick=async()=>{const b=$("#btnWgLoad");b.disabled=true;try{await wgLoad();}catch(e){setConn("bad",esc(e.message||e));}finally{b.disabled=false;}};
+$("#autoFit").onchange=e=>{ST.autoFit=e.target.checked;save();rebuildDossier();};
+$("#compact").onchange=e=>{ST.compact=e.target.checked;Object.assign(ST,modeDefaults(ST.mode));save();renderControls();rangeInfo();rebuildDossier();};
+$("#noThink").onchange=e=>{ST.noThink=e.target.checked;save();};
+$("#url").addEventListener("change",e=>{ST[ST.backend==="ollama"?"urlOllama":"urlOpenai"]=e.target.value.trim();save();connect();});
+$("#btnTest").onclick=connect;
+$("#model").onchange=e=>{ST.model=e.target.value;save();updHdr();};
+$("#numCtx").onchange=e=>{const was=isCompact();ST.numCtx=+e.target.value;if(was!==isCompact())Object.assign(ST,modeDefaults(ST.mode));save();renderControls();rangeInfo();rebuildDossier();};
+$("#temp").onchange=e=>{ST.temp=Math.max(0,Math.min(1.5,+e.target.value||0.4));save();};
+$("#modeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;ST.mode=b.dataset.mode;Object.assign(ST,modeDefaults(ST.mode));save();renderControls();rangeInfo();rebuildDossier();});
+$("#focus").onchange=e=>{FOCUS=e.target.value||defaultFocus();FOCUS_USER=!!e.target.value;rangeInfo();rebuildDossier();};
+$("#back").onchange=e=>{ST.back=+e.target.value;save();rangeInfo();rebuildDossier();};
+$("#ahead").onchange=e=>{ST.ahead=+e.target.value;save();rangeInfo();rebuildDossier();};
+$("#perspChips").addEventListener("change",e=>{ST.persp=$$("#perspChips input:checked").map(i=>i.value);save();renderControls();rebuildDossier();});
+$("#incChips").addEventListener("change",e=>{ST.inc[e.target.value]=e.target.checked?1:0;save();renderControls();rebuildDossier();});
+$("#panel").onchange=e=>{ST.panel=e.target.checked;save();rebuildDossier();};
+$("#kb").onchange=e=>{ST.kb=e.target.checked;save();rebuildDossier();};
+$("#profile").addEventListener("input",e=>{ST.profile=e.target.value;save();});
+$("#profile").addEventListener("change",()=>rebuildDossier());
+$("#dos").addEventListener("input",()=>{DOS_EDITED=true;updTok();});
+$("#btnRebuild").onclick=()=>{if(DOS_EDITED&&!confirm("Deine Änderungen am Dossier verwerfen?"))return;DOS_EDITED=false;rebuildDossier(true);};
+$("#btnShowDos").onclick=()=>{if(!DOS_EDITED)rebuildDossier(true);selTab("dossier");};
+$("#btnRun").onclick=runReview;
+$("#btnStop").onclick=()=>{if(CTRL)CTRL.abort();};
+$("#btnFollow").onclick=followUp;
+$("#followIn").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))followUp();});
+$("#btnExport").onclick=exportMd;$("#btnCopy").onclick=copyMd;
+
+/* ---------- Hilfe ---------- */
+$("#p_help").innerHTML=`
+<h3 style="margin-top:0">Am Handy: drei Wege zum Modell</h3>
+<p><b>1. Ollama in Termux (empfohlen)</b> – das Modell läuft in der kostenlosen Linux-App Termux auf deinem Handy, die Review-App spricht mit <code>127.0.0.1</code>.</p>
+<ol>
+<li>Termux aus <b>F-Droid</b> oder von GitHub installieren (die Play-Store-Version ist veraltet).</li>
+<li>In Termux einmalig: <pre>pkg update &amp;&amp; pkg upgrade
+pkg install ollama
+ollama serve &amp;
+ollama pull qwen3:4b</pre></li>
+<li>Bei jeder Nutzung: Termux öffnen, <code>termux-wake-lock</code> und <code>ollama serve</code> eintippen, Termux offen im Hintergrund lassen → in dieser App „Ollama“ → <b>Verbinden</b>.</li>
+</ol>
+<p class="muted small">Android beendet Hintergrund-Apps gern: für Termux unter Einstellungen ▸ Apps ▸ Termux ▸ Akku „Nicht eingeschränkt“ wählen.</p>
+<p><b>2. llama.cpp in Termux</b> – wie oben, aber <code>pkg install llama-cpp</code> und ein GGUF-Modell mit <code>llama-server -m modell.gguf --port 8080</code> starten. Hier „llama.cpp / OpenAI“ wählen.</p>
+<p><b>3. Im Gerät (WebGPU)</b> – ohne Termux: „Im Gerät“ → <b>Gerät prüfen</b> → Modell wählen → <b>Modell laden</b>. Beim ersten Mal werden 1–3 GB heruntergeladen (WLAN!), danach ist das Modell gespeichert. Funktioniert nur, wenn Handy und Android-WebView WebGPU anbieten – sonst meldet „Gerät prüfen“ das. Experimentell und meist langsamer als Termux.</p>
+
+<h3>Welches Modell bei 8 GB Arbeitsspeicher?</h3>
+<table class="md" style="border-collapse:collapse;font-size:14px"><tr><th>Weg</th><th>Empfehlung</th><th>Hinweis</th></tr>
+<tr><td>Ollama</td><td><code>qwen3:4b</code> (≈2,5 GB)</td><td>beste Wahl; Alternativen <code>gemma3:4b</code>, <code>llama3.2:3b</code></td></tr>
+<tr><td>Ollama, knapp</td><td><code>qwen3:1.7b</code></td><td>wenn 4B abstürzt oder zu langsam ist</td></tr>
+<tr><td>Im Gerät</td><td>Qwen3-1.7B oder Llama-3.2-3B</td><td>4B nur, wenn genug Grafikspeicher frei</td></tr></table>
+<p>Vorher andere Apps schließen. <b>Kompakt</b> (unter „Was ins Dossier kommt“) und <b>Schnellmodus</b> anlassen, Kontextlänge 8192 (bei „Im Gerät“ ggf. 4096). Ein Wochenreview dauert auf dem Handy erfahrungsgemäß einige Minuten; der Bildschirm bleibt dabei an.</p>
+<p><b>Ehrlich gesagt:</b> Kleine Modelle auf dem Handy liefern eine brauchbare zweite Meinung zu Belastung, Erholung und Plan-Ist-Abweichungen, verwechseln aber öfter Studien und bleiben fachlich flacher als große Modelle. Die mitgeschickten <b>Wissensanker</b> und deine <b>eigene Literatur</b> gleichen das teilweise aus.</p>
+
+<h3>Wie deine Daten geschützt sind</h3>
+<ul>
+<li>Planungsmappe und Trainingsdatei werden nur in dieser App gelesen – nichts wird hochgeladen, nichts in der Mappe verändert. Am Handy bleibt die Mappe verbunden und wird vor jedem Review frisch gelesen.</li>
+<li><b>Netzsperre:</b> Sobald gesendet wird, setzt die App eine Sicherheitsrichtlinie, die nur noch Verbindungen zu diesem Gerät erlaubt (Schild oben: „Netz gesperrt“). Sie lässt sich bis zum Neustart nicht aufheben – selbst ein Fehler im Code könnte dann nichts nach außen schicken.</li>
+<li>Bei „Im Gerät“ ist vor dem Senden einmalig der Modell-Download erlaubt (Schild: „Modell-Download offen“). Deine Daten werden erst <i>nach</i> dem Sperren verarbeitet.</li>
+<li><b>Selbst prüfen:</b> Flugmodus an und Review starten – es funktioniert trotzdem, weil alles auf dem Handy passiert.</li>
+<li>Cloud-Modelle von Ollama (Name mit „cloud“) werden gesperrt, weil sie trotz lokaler Adresse extern rechnen.</li>
+<li>Im Tab <b>Dossier</b> siehst du vor dem Senden jedes Wort, das das Modell bekommt, und kannst es kürzen.</li>
+</ul>
+
+<h3>Am Computer</h3>
+<p>Dieselbe Datei läuft auch am Laptop: Ollama oder LM Studio installieren, <code>training_review_starten.py</code> starten (öffnet <code>http://127.0.0.1:8765</code>). Dort sind größere Modelle möglich (<code>qwen3:14b</code>, <code>gemma3:27b</code>, <code>gpt-oss:20b</code>) – Kompakt dann ausschalten.</p>
+
+<h3>Tipps</h3>
+<ul><li>Lieber kurze Zeiträume und gezielte Fragen als alles auf einmal.</li>
+<li><b>Gremium</b> lässt jede Perspektive einzeln urteilen und fasst dann zusammen – am Handy nur mit 2 Perspektiven sinnvoll.</li>
+<li>Wenn die Antwort frühe Wochen „vergisst“, war der Kontext zu klein: Zeitraum verkürzen oder Bereiche abwählen.</li>
+<li>Reviews teilen/speichern: „Als Markdown speichern“ öffnet am Handy das Teilen-Menü (z. B. Drive, Notizen).</li></ul>`;
+
+/* ---------- Start ---------- */
+(async function init(){
+  renderControls();
+  if(location.protocol.startsWith("http")){try{const r=await fetch("/__trv",{cache:"no-store"});if(r.ok){const j=await r.json();VIA_PROXY=!!j.proxy;}}catch(e){}}
+  try{for(const k of ["mappe","json"]){const h=await IDB.get("kv","fh_"+k);if(h){FH[k]=h;try{if(h.queryPermission&&(await h.queryPermission({mode:"read"}))==="granted")await readHandle(k);}catch(e){}}}}catch(e){}
+  if(ST.backend!=="webgpu")lockNet();else updShield();
+  if(LF()){for(const k of ["mappe","json"])await refresh(k,true);}
+  renderFiles();if(!FOCUS){FOCUS=defaultFocus();$("#focus").value=FOCUS;}rangeInfo();updTok();
+  selTab(matchMedia("(max-width:900px)").matches?"setup":"review");
+  loadLit();renderHist();connect();
+})();
+</script>
+</body>
+</html>
